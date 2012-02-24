@@ -7,15 +7,30 @@ from upnpy import USER_AGENT
 from time import strftime, gmtime
 
 from twisted.internet.protocol import Protocol
-import socket
+import socket, re
+
+from lxml import etree
 
 class NoSuchActionError(ValueError):
     pass
 
 class SOAPResponseParser(object):
     
+    def __init__(self, action):
+        self.action = action
+        
     def parse(self, xml):
-        pass
+        
+        #print "XML:",xml
+        
+        ret = {}
+        for arg  in self.action.argumentList.values():
+            if arg.direction == arg.DIR_IN: continue
+            
+            match = re.search('<%(tag)s>([^<]*)</%(tag)s>' % {'tag': arg.name}, xml)
+            ret[arg.name] = match.group(1)
+        
+        return ret
     
 class SOAPSendRequest(Protocol):
     
@@ -34,8 +49,6 @@ class SOAP(object):
     
     ARG_TPL = "<%(name)s>%(value)s</%(name)s>\r\n"
     
-    #REQ_TPL = '<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
-    #REQ_TPL+= '<s:Body><u:%(actionName)s xmlns:u="%(urn)s">%(args)s</u:%(actionName)s></s:Body></s:Envelope>'
     REQ_TPL = ENVELOPE_TPL % '<u:%(actionName)s xmlns:u="%(urn)s">%(args)s</u:%(actionName)s>'
     RESP_TPL = ENVELOPE_TPL % '<u:%(actionName)sResponse xmlns:u="%(urn)s">%(args)s</u:%(actionName)sResponse>'
 
@@ -45,7 +58,7 @@ class SOAP(object):
     REQ_HEADERS+= 'CONTENT-LENGTH: %(contentLen)s\r\n'
     REQ_HEADERS+= 'CONTENT-TYPE: text/xml; charset="utf-8"\r\n'
     REQ_HEADERS+= 'USER-AGENT: ' + USER_AGENT + '\r\n' 
-    REQ_HEADERS+= 'SOAPACTION: %(action)s\r\n\r\n'
+    REQ_HEADERS+= 'SOAPACTION: "%(action)s"\r\n\r\n'
     
     RESP_HEADERS = 'POST %(path)s HTTP/1.0\r\n'
     RESP_HEADERS+= 'DATE: %(date)s\r\n'        
@@ -65,7 +78,7 @@ class SOAP(object):
                 
         
         xml = self.REQ_TPL % {'actionName': action.name,
-                              'urn': actionId,
+                              'urn': service.serviceType,
                               'args': args}
         
         hdr = self.REQ_HEADERS % {'path': service.controlURL,
@@ -96,6 +109,9 @@ class SOAP(object):
     def invokeAction(self, service, action, args):        
         req = self._genRequest(service, action, args)
         
+        #print 'Sending SOAP:', req
+        #print service.host, service.port
+        
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((service.host, service.port))
         s.sendall(req)
@@ -105,8 +121,10 @@ class SOAP(object):
             if not data: break
             resp += data
         s.close()
-        
-        return resp
+    
+        #print resp
+        parser = SOAPResponseParser(action)    
+        return parser.parse(resp[resp.find('<'):])
     
     def invokeActionByName(self, service, actionName, args):
         action = service.actions[actionName]

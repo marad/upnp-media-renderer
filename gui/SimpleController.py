@@ -9,30 +9,79 @@ from upnpy.ssdp import SSDP
 from upnpy.soap import SOAP
 
 from PyQt4.QtGui import QWidget, QBoxLayout, QTreeWidget, QTreeWidgetItem, QLabel, QTextEdit
+from PyQt4.QtGui import QPushButton, QGroupBox, QLineEdit
 from PyQt4.QtCore import SIGNAL
 
 class ActionWindow(QWidget):
     def __init__(self, service, action):
-        QWidget.__init__(self)
-        self.setupUI()
-        self.soap = SOAP()
+        QWidget.__init__(self, parent=None)
         self.service = service
         self.action = action
+        self.args = {}
+        self.outs = {}
+        
+        self.setupUI()
+        self.soap = SOAP()
         
     def setupUI(self):
         self.setWindowTitle('Service view')
         
+        layout = QBoxLayout(QBoxLayout.TopToBottom)
+        
+        inGroup = QGroupBox('Input Arguments')
         vlay = QBoxLayout(QBoxLayout.TopToBottom)
         
         for arg in self.action.argumentList.values():
+            if arg.direction == arg.DIR_OUT: continue
+            #print 'Argument: ', arg.name
+            
+            edit = QLineEdit()
+            QWidget.connect(edit, SIGNAL('textChanged(QString)'), lambda x: self.textChanged(arg.name, edit))
+            
             hlay = QBoxLayout(QBoxLayout.LeftToRight)
             hlay.addWidget(QLabel(arg.name))
-            hlay.addWidget(QTextEdit())
+            hlay.addWidget(edit)
             vlay.addLayout(hlay)
         
-        self.setLayout(vlay)
+        if vlay.count() > 0:
+            inGroup.setLayout(vlay)
+            layout.addWidget(inGroup)
         
+        outGroup = QGroupBox('Output Arguments')
+        vlay = QBoxLayout(QBoxLayout.TopToBottom)
+        for arg in self.action.argumentList.values():            
+            if arg.direction == arg.DIR_IN: continue
+            #print 'Argument: ', arg.name
+            
+            edit = QLineEdit()
+            self.outs[arg.name] = edit
+            
+            hlay = QBoxLayout(QBoxLayout.LeftToRight)
+            hlay.addWidget(QLabel(arg.name))
+            hlay.addWidget(edit)
+            vlay.addLayout(hlay)
+           
+        if vlay.count() > 0: 
+            outGroup.setLayout(vlay)
+            layout.addWidget(outGroup)
+                 
+        button = QPushButton('Invoke')
+        QWidget.connect(button, SIGNAL('clicked()'), self.sendSoap)
         
+        layout.addWidget(button)
+        
+        self.setLayout(layout)
+        self.adjustSize()
+        
+    def textChanged(self, argName, edit):
+        self.args[argName] = edit.text()
+        
+    def sendSoap(self):        
+        out = self.soap.invokeAction(self.service, self.action, self.args)
+        
+        for name, value in zip(out.keys(), out.values()):
+            edit = self.outs[name]
+            edit.setText(value)
 
 class SimpleController(QWidget):
     def __init__(self):
@@ -42,7 +91,8 @@ class SimpleController(QWidget):
         self.ssdp = SSDP()
         self.ssdp.addHandler(self.deviceFound)
         self.ssdp.listen()
-        self.ssdp.search(target='upnp:rootdevice')
+        self.ssdp.search(target='upnp:rootdevice', mx=1)
+        self.act = None
     
     def setupUI(self):
         
@@ -54,7 +104,7 @@ class SimpleController(QWidget):
         
         self.tree.setColumnCount(1)
         self.tree.setHeaderLabel('Urzadzenia')
-        QWidget.connect( self.tree, SIGNAL("itemDoubleClicked()"), self.actionActivated)      
+        QWidget.connect( self.tree, SIGNAL("itemDoubleClicked(QTreeWidgetItem*,int)"), self.actionActivated)      
         
         layout = QBoxLayout(QBoxLayout.LeftToRight)
         layout.addWidget(self.tree, 2)
@@ -65,8 +115,7 @@ class SimpleController(QWidget):
     def deviceFound(self, headers, device):        
         self.addDevice(device)
     
-    def addDevice(self, device, parentItem = None):
-        print device
+    def addDevice(self, device, parentItem = None):        
         if not (device.UDN in self.knownDevices):
             
             devItem = QTreeWidgetItem(parentItem, [device.friendlyName])
@@ -94,4 +143,8 @@ class SimpleController(QWidget):
             self.knownDevices.append(device.UDN)
     
     def actionActivated(self, item, column):
-        print item, column
+        if 'action' in vars(item).keys():
+            #print 'Opening window for action', item.action.name
+            self.act = ActionWindow(item.service, item.action)
+            self.act.resize(300, 200)
+            self.act.setVisible(True)

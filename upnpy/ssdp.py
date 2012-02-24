@@ -89,7 +89,7 @@ class SSDP(DatagramProtocol):
                     name, value = [name.strip().upper(), value.strip()]
                     data[name] = value
             
-            print addr, data
+            #print addr, data
             
             # Check if we've found the device
             if 'LOCATION' in data.keys():
