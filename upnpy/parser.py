@@ -6,11 +6,11 @@ Created on 23-02-2012
 
 import re
 import urllib2
-from xml.dom.minidom import parseString
+#from xml.dom.minidom import parseString
 from lxml import etree
-from upnp.device import Device, Service, Icon, StateVariable, Action, ActionArgument
+from upnpy.device import Device, Service, Icon, StateVariable, Action, ActionArgument
 
-class DeviceDescriptionParser():
+class DeviceDescriptionParser(object):
     
     def __init__(self):
         self.namespaces = {
@@ -65,13 +65,14 @@ class DeviceDescriptionParser():
         
     def _createService(self, baseURL, serviceNode):        
         service = Service()
+        service.baseURL     = baseURL
         service.serviceType = self._xpath(serviceNode, 'dev:serviceType/text()')
         service.serviceId   = self._xpath(serviceNode, 'dev:serviceId/text()')
         service.SCPDURL     = self._xpath(serviceNode, 'dev:SCPDURL/text()')
         service.controlURL  = self._xpath(serviceNode, 'dev:controlURL/text()')
         service.eventSubURL = self._xpath(serviceNode, 'dev:eventSubURL/text()')
         
-        response = urllib2.urlopen(baseURL + service.SCPDURL)
+        response = urllib2.urlopen(service.SCPDURL)
         doc = etree.fromstring(response.read())
         
         for variableNode in doc.xpath('srv:serviceStateTable/srv:stateVariable', namespaces=self.namespaces):
@@ -121,9 +122,12 @@ class DeviceDescriptionParser():
         response = urllib2.urlopen(rootDeviceDescLocation)
         xml = response.read()    
         doc = etree.fromstring(xml)
+            
         
         #deviceNode = doc.xpath("dev:device", namespaces=self.namespaces)
         deviceNode = self._xpath(doc, 'dev:device')
-        baseURL = re.search('http://[^/]*', data['LOCATION']).group(0)
+        baseURL = re.search('^[^:]+://[^/]*', data['LOCATION']).group(0)
         
-        return self._createDevice(baseURL, deviceNode) 
+        device = self._createDevice(baseURL, deviceNode)
+        device.rootDescURL = rootDeviceDescLocation
+        return device 

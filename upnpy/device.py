@@ -5,14 +5,11 @@ Created on 19-02-2012
 '''
 
 import re
-import urllib2
-from xml.dom.minidom import parseString
-from lxml import etree
-from upnp.util import Entity
+from upnpy.util import Entity
         
 ########################################################################
 # Holds device icon information
-class Icon:
+class Icon(object):
     def __init__(self, device=None, mimetype=None, width=None, height=None, depth=None, url=None):
         self.device = device
         self.mimetype = mimetype
@@ -23,7 +20,7 @@ class Icon:
         
 ########################################################################
 # Represents UPnP device
-class Device:
+class Device(object):
     #def __init__(self, type=None, friendlyName=None, 
     #             manufacturer=None, manufacturerURL=None,
     #             modelDescription=None, modelNumber=None, modelName=None, modelURL=None,
@@ -43,29 +40,82 @@ class Device:
         self.modelName = ""
         self.modelURL = ""
         self.serialNumber = ""
-        self.udn = ""
+        self.UDN = ""
         self.presentationURL = ""
+        self.baseURL = ""
+        self.rootDescURL = ""
         #self.location = deviceDesc.location
 
+    
         
 ########################################################################
 # Represents UPnP device Service
-class Service:
+class Service(object):    
+    #@property
+    #def SCPDURL(self):
+    #    def fget(self):
+    #        return "%s/%s" % (self.baseURL, self._SCPDURL)
+    
     def __init__(self):
+        self.baseURL = ""
         self.device = ""
         self.serviceType = ""
         self.serviceId = ""
-        self.controlURL = ""
-        self.eventSubURL = ""
-        self.SCPDURL = ""
+        self._controlURL = ""
+        self._eventSubURL = ""
+        self._SCPDURL = ""
         #self.actions, self.stateVariables = _parseSCPD(self.device.location.rstrip('/') + '/' + self.SCPDURL.lstrip('/'))
         self.actions = {}
         self.stateVariables = {}
+        
+    def _findBaseUrl(self, val):
+        match = re.search('^[^:]+://[^/]*', val)
+        if match == None:
+            return self.baseURL
+        else:
+            return match.group(0)
+     
+    @property
+    def SCPDURL(self):
+        return self._SCPDURL 
     
+    @SCPDURL.setter
+    def SCPDURL(self, val):
+        base = self._findBaseUrl(val)
+        self.SCPDPath = val
+        self._SCPDURL = base.rstrip('/') + '/' + val.lstrip('/')
+        
+    @property
+    def host(self):
+        return re.search('^[^:]+://([^/:]*)', self.baseURL).group(1)
+    
+    @property
+    def port(self):
+        return int(re.search('^[^:]+://[^/:]*:([^/]*)', self.baseURL).group(1))
+    
+#    @property
+#    def controlURL(self):
+#        return self._controlURL
+#    
+#    @controlURL.setter
+#    def controlURL(self, val):
+#        base = self._findBaseUrl(val)
+#        self.controlURLPath = val
+#        self._controlURL = base.rstrip('/') + '/' + val.lstrip('/')
+        
+#    @property
+#    def eventSubURL(self):
+#        return self._eventSubURL
+#    
+#    @eventSubURL.setter
+#    def eventSubURL(self, val):
+#        base = self._findBaseUrl(val)
+#        self.eventSubURLPath = val
+#        self._eventSubURL = base.rstrip('/') + '/' + val.lstrip('/')
     
 ########################################################################
 # Holds service state variable information
-class StateVariable:
+class StateVariable(object):
     TYPE_UI1        = "ui1"
     TYPE_UI2        = "ui2"
     TYPE_UI4        = "ui4"
@@ -105,7 +155,7 @@ class StateVariable:
 
 ########################################################################
 # Holds service action argument information
-class ActionArgument:
+class ActionArgument(object):
     DIR_IN = "in"
     DIR_OUT = "out"
     def __init__(self):
@@ -116,7 +166,7 @@ class ActionArgument:
 
 ########################################################################
 # Represents service action
-class Action:
+class Action(object):
     def __init__(self):
         self.name = None
         self.argumentList = {}
