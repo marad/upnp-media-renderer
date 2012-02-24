@@ -9,9 +9,10 @@ from time import strftime, gmtime
 from twisted.internet.protocol import Protocol
 import socket, re
 
-from lxml import etree
-
 class NoSuchActionError(ValueError):
+    pass
+
+class EmptyResponseException(Exception):
     pass
 
 class SOAPResponseParser(object):
@@ -28,8 +29,10 @@ class SOAPResponseParser(object):
             if arg.direction == arg.DIR_IN: continue
             
             match = re.search('<%(tag)s>([^<]*)</%(tag)s>' % {'tag': arg.name}, xml)
+            if not match:
+                raise EmptyResponseException()
             ret[arg.name] = match.group(1)
-        
+            
         return ret
     
 class SOAPSendRequest(Protocol):

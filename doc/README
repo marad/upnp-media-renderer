@@ -4,3 +4,11 @@ System requirements:
 2) python-twisted
 3) PyQt4 & Qt4 runtime
 4) python-lxml
+
+
+Installation:
+	Ubuntu:
+		sudo apt-get install python-twisted python-qt4 python-lxml
+
+	Fedora:
+		?
