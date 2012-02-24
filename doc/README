@@ -1,0 +1,6 @@
+System requirements:
+
+1) Python >= 2.5
+2) python-twisted
+3) PyQt4 & Qt4 runtime
+4) python-lxml
