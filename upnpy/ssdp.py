@@ -51,8 +51,10 @@ class SSDP(DatagramProtocol):
     NOTIFY_TPL+= '\r\n'
     
     def __init__(self):
+        self._cache = {}
         self.deviceFoundHandlers = []
         self.descriptionParser = DeviceDescriptionParser()
+        
         
     def listen(self):
         self.unicast = reactor.listenUDP(0, SSDPUnicast(self)) #@UndefinedVariable
@@ -89,21 +91,26 @@ class SSDP(DatagramProtocol):
                     name, value = [name.strip().upper(), value.strip()]
                     data[name] = value
             
-            #print addr, data
-            
             # Check if we've found the device
             if 'LOCATION' in data.keys():
                 
-                try: # Try to parse the device XML           
-                    #device = parseRootDeviceDesc(data)
-                    device = self.descriptionParser.parse(data)
-                    for handler in self.deviceFoundHandlers:
-                        handler(data, device)
-                except Exception as e: # But if you cant
-                    import traceback
-                    import sys
-                    traceback.print_exc(file=sys.stderr)
-                    print e
+                #print addr, data
+                
+                location = data['LOCATION']
+                if location not in self._cache.keys():
+                    try: # Try to parse the device XML           
+                        #device = parseRootDeviceDesc(data)
+                        device = self.descriptionParser.parse(location)
+                        
+                        self._cache[location] = device
+                        
+                        for handler in self.deviceFoundHandlers:
+                            handler(data, device)
+                    except Exception as e: # But if you cant
+                        import traceback
+                        import sys
+                        traceback.print_exc(file=sys.stderr)
+                        print e
                 
         except Exception as e:
             print repr(e)
@@ -137,3 +144,8 @@ class SSDP(DatagramProtocol):
     def _genUUID(self, name):
         return uuid.uuid5(uuid.NAMESPACE_URL, name)
     
+    
+    @property
+    def devices(self):
+        return self._cache.values()
+        

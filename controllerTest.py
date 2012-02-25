@@ -16,7 +16,7 @@ from twisted.internet import reactor
 ######################################################
     
 from upnpy.ssdp import SSDP
-from upnpy.soap import SOAP
+from upnpy.soap import SOAPClient
 from gui.SimpleController import SimpleController
 
 if __name__ == "__main__":

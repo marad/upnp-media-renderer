@@ -90,7 +90,8 @@ class DeviceDescriptionParser(object):
             variable.sendEvents = self._xpath(variableNode, '@sendEvents')
             variable.multicast  = self._xpath(variableNode, '@multicast')
             
-            service.stateVariables[variable.name] = variable
+            #service.stateVariables[variable.name] = variable
+            service.addStateVariable(variable)
         
         for actionNode in doc.xpath('srv:actionList/srv:action', namespaces=self.namespaces):
             action = Action()
@@ -102,8 +103,10 @@ class DeviceDescriptionParser(object):
                 argument.retval     = self._xpath(argumentNode, 'srv:retval/text()')
                 argument.relatedStateVariable = self._xpath(argumentNode, 'srv:relatedStateVariable/text()')
                 argument.stateVariableRef = service.stateVariables[argument.relatedStateVariable]
-                action.argumentList[argument.name] = argument
-            service.actions[action.name] = action
+                #action.argumentList[argument.name] = argument
+                action.addArgument(argument)
+            #service.actions[action.name] = action
+            service.addAction(action)
         return service
     
     ########################################################################
@@ -112,22 +115,24 @@ class DeviceDescriptionParser(object):
     #     data - dictionary from SSDP headers
     # Returns device object
     
-    def parse(self, data):
+    def parse(self, rootDeviceDescURL):
         
-        if data == None or data['LOCATION'] == None:
-            return None
+#        if data == None or data['LOCATION'] == None:
+#            return None
+#        
+#        rootDeviceDescURL = data['LOCATION']
         
-        rootDeviceDescLocation = data['LOCATION']
-        
-        response = urllib2.urlopen(rootDeviceDescLocation)
+        response = urllib2.urlopen(rootDeviceDescURL)
         xml = response.read()    
         doc = etree.fromstring(xml)
             
         
         #deviceNode = doc.xpath("dev:device", namespaces=self.namespaces)
         deviceNode = self._xpath(doc, 'dev:device')
-        baseURL = re.search('^[^:]+://[^/]*', data['LOCATION']).group(0)
+        baseURL = re.search('^[^:]+://[^/]*', rootDeviceDescURL).group(0)
         
         device = self._createDevice(baseURL, deviceNode)
-        device.rootDescURL = rootDeviceDescLocation
-        return device 
+        device.rootDescURL = rootDeviceDescURL
+        return device
+
+      

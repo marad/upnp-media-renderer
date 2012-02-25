@@ -11,7 +11,7 @@ from twisted.internet import reactor
 ######################################################
     
 from upnpy.ssdp import SSDP
-from upnpy.soap import SOAP
+from upnpy.soap import SOAPClient
 from upnpy.controller import ControllerFactory
 
 from twisted.internet.protocol import Factory
@@ -35,7 +35,7 @@ def showProps(o, prefix=''):
     try:
         v = vars(o)
     except: 
-        log( prefix + v )
+        log( prefix + repr(o) )
         return
     
     for k, v in zip(v.keys(), v.values()):

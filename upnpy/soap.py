@@ -6,10 +6,7 @@ Created on 24-02-2012
 from upnpy import USER_AGENT
 from time import strftime, gmtime
 
-from twisted.internet.protocol import Protocol
 import socket, re
-
-from lxml import etree
 
 class NoSuchActionError(ValueError):
     pass
@@ -28,22 +25,15 @@ class SOAPResponseParser(object):
             if arg.direction == arg.DIR_IN: continue
             
             match = re.search('<%(tag)s>([^<]*)</%(tag)s>' % {'tag': arg.name}, xml)
-            ret[arg.name] = match.group(1)
+            if not match:
+                ret = None
+            else:
+                ret[arg.name] = match.group(1)
         
         return ret
     
-class SOAPSendRequest(Protocol):
-    
-    def __init__(self, soapRequest):
-        self.soapRequest = soapRequest
-    
-    def connectionMade(self):
-        self.transport.write(self.soapRequest)
-        
-    def dataReceived(self, data):
-        print 'SOAP RESPONSE: ' + data
-        
-class SOAP(object):
+
+class SOAPClient(object):
     ENVELOPE_TPL = '<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
     ENVELOPE_TPL+= '<s:Body>%s</s:Body></s:Envelope>'
     

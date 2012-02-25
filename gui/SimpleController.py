@@ -6,10 +6,10 @@ Created on 24-02-2012
 '''
 
 from upnpy.ssdp import SSDP
-from upnpy.soap import SOAP
+from upnpy.soap import SOAPClient
 
 from PyQt4.QtGui import QWidget, QBoxLayout, QTreeWidget, QTreeWidgetItem, QLabel, QTextEdit
-from PyQt4.QtGui import QPushButton, QGroupBox, QLineEdit
+from PyQt4.QtGui import QPushButton, QGroupBox, QLineEdit, QMessageBox
 from PyQt4.QtCore import SIGNAL
 
 class ActionWindow(QWidget):
@@ -21,7 +21,7 @@ class ActionWindow(QWidget):
         self.outs = {}
         
         self.setupUI()
-        self.soap = SOAP()
+        self.soap = SOAPClient()
         
     def setupUI(self):
         self.setWindowTitle('Service view')
@@ -79,9 +79,12 @@ class ActionWindow(QWidget):
     def sendSoap(self):        
         out = self.soap.invokeAction(self.service, self.action, self.args)
         
-        for name, value in zip(out.keys(), out.values()):
-            edit = self.outs[name]
-            edit.setText(value)
+        if out == None:
+            QMessageBox.warning(self, 'Oops!', 'There was a problem with communication!')
+        else:
+            for name, value in zip(out.keys(), out.values()):
+                edit = self.outs[name]
+                edit.setText(value)
 
 class SimpleController(QWidget):
     def __init__(self):
@@ -125,7 +128,7 @@ class SimpleController(QWidget):
                 self.addDevice(subDev, devItem)
                 
             for srv in device.services.values():
-                srvItem = QTreeWidgetItem(devItem, [srv.serviceId])
+                srvItem = QTreeWidgetItem(devItem, [srv.friendlyName])
                 srvItem.service = srv
                 for action in srv.actions.values():
                     actItem = QTreeWidgetItem(srvItem, [action.name])

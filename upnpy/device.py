@@ -31,19 +31,19 @@ class Device(object):
         self.services = {} # service id => service
         self.icons = [] # icon list
         
-        self.deviceType = ""
-        self.friendlyName = ""
-        self.manufacturer = ""
-        self.manufacturerURL = ""
-        self.modelDescription = ""
-        self.modelNumber = ""
-        self.modelName = ""
-        self.modelURL = ""
-        self.serialNumber = ""
-        self.UDN = ""
-        self.presentationURL = ""
-        self.baseURL = ""
-        self.rootDescURL = ""
+        self.deviceType = None
+        self.friendlyName = None
+        self.manufacturer = None
+        self.manufacturerURL = None
+        self.modelDescription = None
+        self.modelNumber = None
+        self.modelName = None
+        self.modelURL = None
+        self.serialNumber = None
+        self.UDN = None
+        self.presentationURL = None
+        self.baseURL = None
+        self.rootDescURL = None
         #self.location = deviceDesc.location
 
     
@@ -57,16 +57,32 @@ class Service(object):
     #        return "%s/%s" % (self.baseURL, self._SCPDURL)
     
     def __init__(self):
-        self.baseURL = ""
-        self.device = ""
-        self.serviceType = ""
-        self.serviceId = ""
-        self._controlURL = ""
-        self._eventSubURL = ""
-        self._SCPDURL = ""
+        self.baseURL = None
+        self.device = None
+        self.serviceType = None
+        self.serviceId = None
+        self._controlURL = None
+        self._eventSubURL = None
+        self._SCPDURL = None
         #self.actions, self.stateVariables = _parseSCPD(self.device.location.rstrip('/') + '/' + self.SCPDURL.lstrip('/'))
         self.actions = {}
         self.stateVariables = {}
+        
+    
+    def invokeMethod(self, name, kwargs):
+        method = getattr(self, name)
+        method(*kwargs)
+    
+    def addStateVariable(self, stVar=None, descDict=None):
+
+        if stVar != None:
+            self.stateVariables[stVar.name] = stVar
+        elif descDict != None:
+            stVar = StateVariable(**descDict)
+            self.addStateVariable(stVar)
+        
+    def addAction(self, action):
+        self.actions[action.name] = action
         
     def _findBaseUrl(self, val):
         match = re.search('^[^:]+://[^/]*', val)
@@ -87,11 +103,25 @@ class Service(object):
         
     @property
     def host(self):
-        return re.search('^[^:]+://([^/:]*)', self.baseURL).group(1)
+        try:
+            return re.search('^[^:]+://([^/:]*)', self.baseURL).group(1)
+        except:
+            return ""
     
     @property
     def port(self):
-        return int(re.search('^[^:]+://[^/:]*:([^/]*)', self.baseURL).group(1))
+        try:
+            return int(re.search('^[^:]+://[^/:]*:([^/]*)', self.baseURL).group(1))
+        except:
+            return 0
+    
+    @property
+    def friendlyName(self):
+        try:
+            match = re.search('urn:upnp-org:serviceId:([^:]*):(.*)', self.serviceId)
+            return "%s (v%s)" % (match.group(1), match.group(2)) 
+        except:
+            return self.serviceId
     
 #    @property
 #    def controlURL(self):
@@ -141,34 +171,59 @@ class StateVariable(object):
     TYPE_URI        = "uri"
     TYPE_UUID       = "uuid"
     
-    def __init__(self):
-        self.name = None
-        self.dataType = None
-        self.defaultValue = None
-        self.allowedValueList = []
+    def __init__(self, 
+                 name = None,
+                 dataType = None,
+                 defaultValue = None,
+                 allowedValueList = [],
+                 allowedValueRangeMin = None,
+                 allowedValueRangeMax = None,
+                 allowedValueRangeStep = None,
+                 sendEvents = None,
+                 multicast = None):
+        self.name = name
+        self.dataType = dataType
+        self.defaultValue = defaultValue
+        self.allowedValueList = allowedValueList
         self.allowedValueRange = Entity()
-        self.allowedValueRange.min = None
-        self.allowedValueRange.max = None
-        self.allowedValueRange.step = None
-        self.sendEvents = None
-        self.multicast = None
+        self.allowedValueRange.min = allowedValueRangeMin
+        self.allowedValueRange.max = allowedValueRangeMax
+        self.allowedValueRange.step = allowedValueRangeStep
+        self.sendEvents = sendEvents
+        self.multicast = multicast
 
 ########################################################################
 # Holds service action argument information
 class ActionArgument(object):
     DIR_IN = "in"
     DIR_OUT = "out"
-    def __init__(self):
-        self.name = None
-        self.direction = None
-        self.retval =  None
-        self.relatedStateVariable = None
+    def __init__(self, 
+                 name=None,
+                 direction=None,
+                 retval=None,
+                 relatedStateVariable=None):
+        self.name = name
+        self.direction = direction
+        self.retval =  retval
+        self.relatedStateVariable = relatedStateVariable
+        self.relatedStateVariableRef = None
 
 ########################################################################
 # Represents service action
 class Action(object):
-    def __init__(self):
-        self.name = None
-        self.argumentList = {}
+    def __init__(self,
+                 name=None,
+                 argumentList={}):
+        self.name = name
+        self.argumentList = argumentList
         
+    def addArgument(self, arg):
+        self.argumentList[arg.name] = arg
     
+    @property
+    def args(self):
+        return self.argumentList.values()
+    
+    @property
+    def argNames(self):
+        return self.argumentList.keys() 
