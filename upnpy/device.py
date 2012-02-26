@@ -5,7 +5,21 @@ Created on 19-02-2012
 '''
 
 import re
+from lxml import etree
 from upnpy.util import Entity
+
+def _createNodesFromAttrs(obj, attrList, parent):
+    #nodes = []
+    for name in attrList:
+        value = getattr(obj, name)
+        if value == None:
+            continue
+        node = etree.Element(name)
+        node.text = str(value)
+        parent.append(node)
+        #nodes.append(node)
+        
+    #return nodes
         
 ########################################################################
 # Holds device icon information
@@ -17,10 +31,27 @@ class Icon(object):
         self.height = height
         self.depth = depth
         self.url = url
+    
+    def toXML(self):
+        icon = etree.Element('icon')
+        _createNodesFromAttrs(self, ['mimetype', 
+                                     'width', 'height',
+                                     'depth', 'url'], 
+                              icon)
+        return icon
         
 ########################################################################
 # Represents UPnP device
 class Device(object):
+    
+#    ROOTXML_TPL = '<root xmlns="urn:schemas-upnp-org:device-1-0">\r\n'
+#    ROOTXML_TPL+= '    <specVersion>\r\n'
+#    ROOTXML_TPL+= '        <major>1</major>\r\n'
+#    ROOTXML_TPL+= '        <minor>0</minor>\r\n'
+#    ROOTXML_TPL+= '    </specVersion>\r\n'
+#    ROOTXML_TPL+= '%s'
+     
+    
     #def __init__(self, type=None, friendlyName=None, 
     #             manufacturer=None, manufacturerURL=None,
     #             modelDescription=None, modelNumber=None, modelName=None, modelURL=None,
@@ -41,12 +72,36 @@ class Device(object):
         self.modelURL = None
         self.serialNumber = None
         self.UDN = None
+        self.UPC = None
         self.presentationURL = None
         self.baseURL = None
         self.rootDescURL = None
         #self.location = deviceDesc.location
 
-    
+    def genDeviceDesc(self):
+        node = etree.Element('device')
+        iconList = etree.Element('iconList')
+        devList = etree.Element('devices')
+        srvList = etree.Element('services')
+                
+        _createNodesFromAttrs(self, ['deviceType', 'friendlyName', 'manufacturer',
+                                     'manufacturerURL', 'modelDescription', 'modelNumber',
+                                     'modelName', 'modelURL', 'serialNumber', 'UDN', 'UPC',
+                                     'presentationURL'],
+                              node)
+        for icon in self.icons:
+            iconList.append(icon.toXML())
+        node.append(iconList)
+        
+        for device in self.devices.values():
+            devList.append(device.genDeviceDesc())
+        node.append(devList)
+            
+        for service in self.services.values():
+            srvList.append(service.toXML())
+        node.append(srvList)
+            
+        return node
         
 ########################################################################
 # Represents UPnP device Service
@@ -61,12 +116,48 @@ class Service(object):
         self.device = None
         self.serviceType = None
         self.serviceId = None
-        self._controlURL = None
-        self._eventSubURL = None
+        self.controlURL = None
+        self.eventSubURL = None
         self._SCPDURL = None
         #self.actions, self.stateVariables = _parseSCPD(self.device.location.rstrip('/') + '/' + self.SCPDURL.lstrip('/'))
         self.actions = {}
         self.stateVariables = {}
+        
+    def toXML(self):
+        service = etree.Element('service')
+        
+        _createNodesFromAttrs(self, ['serviceType', 'serviceId', 'controlURL', 'eventSubURL'], service)
+        
+        scpdNode = etree.Element('SCPDURL')
+        scpdNode.text = self.SCPDPath
+        service.append(scpdNode)
+        
+        return service
+    
+    def genSCPD(self):
+        scpd = etree.Element('scpd', xmlns="urn:schemas-upnp-org:service-1-0")
+        specVersion = etree.Element('specVersion')
+        major = etree.Element('major')
+        major.text = '1'
+        minor = etree.Element('minor')
+        minor.text = '0'
+        
+        specVersion.append(major)
+        specVersion.append(minor)
+        scpd.append(specVersion)
+        
+        actionList = etree.Element('actionList')
+        serviceStateTable = etree.Element('serviceStateTable')
+        
+        for action in self.actions.values():
+            actionList.append(action.toXML())
+        scpd.append(actionList)
+        
+        for variable in self.stateVariables.values():
+            serviceStateTable.append(variable.toXML())
+        scpd.append(serviceStateTable)
+        
+        return scpd
         
     
     def invokeMethod(self, name, kwargs):
@@ -118,8 +209,12 @@ class Service(object):
     @property
     def friendlyName(self):
         try:
-            match = re.search('urn:upnp-org:serviceId:([^:]*):(.*)', self.serviceId)
-            return "%s (v%s)" % (match.group(1), match.group(2)) 
+            # urn:upnp-org
+            match = re.search(':serviceId:([^:]*)(:(.*))?', self.serviceId)
+            if match.group(3) == None:
+                return match.group(1)
+            else:
+                return "%s (v%s)" % (match.group(1), match.group(3)) 
         except:
             return self.serviceId
     
@@ -175,7 +270,7 @@ class StateVariable(object):
                  name = None,
                  dataType = None,
                  defaultValue = None,
-                 allowedValueList = [],
+                 allowedValueList = None,
                  allowedValueRangeMin = None,
                  allowedValueRangeMax = None,
                  allowedValueRangeStep = None,
@@ -184,14 +279,56 @@ class StateVariable(object):
         self.name = name
         self.dataType = dataType
         self.defaultValue = defaultValue
-        self.allowedValueList = allowedValueList
+        if allowedValueList == None:
+            self.allowedValueList = []
+        else:
+            self.allowedValueList = allowedValueList
         self.allowedValueRange = Entity()
         self.allowedValueRange.min = allowedValueRangeMin
         self.allowedValueRange.max = allowedValueRangeMax
         self.allowedValueRange.step = allowedValueRangeStep
         self.sendEvents = sendEvents
         self.multicast = multicast
+        
+        self.value = self.defaultValue
 
+    def toXML(self):
+        var = etree.Element('stateVariable')
+        if self.sendEvents != None:
+            var.set('sendEvents', self.sendEvents)
+        
+        if self.multicast != None:
+            var.set('multicast', self.multicast)
+        
+        _createNodesFromAttrs(self, ['name', 'dataType', 'defaultValue'], var)
+        
+        valueList = etree.Element('allowedValueList')
+        for value in self.allowedValueList:
+            node = etree.Element('allowedValue')
+            node.text = str(value)
+            valueList.append(node)
+        
+        var.append(valueList)
+        
+        valueRange = etree.Element('allowedValueRange')
+        if self.allowedValueRange.max:
+            max = etree.Element('maximum')
+            max.text = self.allowedValueRange.max
+            valueRange.append(max) 
+        
+        if self.allowedValueRange.min:
+            min = etree.Element('minimum')
+            min.text = self.allowedValueRange.min
+            valueRange.append(min)
+        
+        if self.allowedValueRange.step:
+            step = etree.Element('step')
+            step.text = self.allowedValueRange.step
+            valueRange.append(step)
+        
+        var.append(valueRange)
+        return var
+        
 ########################################################################
 # Holds service action argument information
 class ActionArgument(object):
@@ -207,15 +344,33 @@ class ActionArgument(object):
         self.retval =  retval
         self.relatedStateVariable = relatedStateVariable
         self.relatedStateVariableRef = None
+        
+    def toXML(self):
+        node = etree.Element('argument')
+        _createNodesFromAttrs(self, ['name', 'direction', 'retval', 'relatedStateVariable'], node)
+        return node
 
 ########################################################################
 # Represents service action
 class Action(object):
     def __init__(self,
                  name=None,
-                 argumentList={}):
+                 argumentList=None):
         self.name = name
-        self.argumentList = argumentList
+        if argumentList == None:
+            self.argumentList = {}
+        else: 
+            self.argumentList = argumentList
+            
+    def toXML(self):
+        action = etree.Element('action')
+        _createNodesFromAttrs(self, ['name'], action)
+        argumentList = etree.Element('argumentList')
+        
+        for argument in self.argumentList.values():
+            argumentList.append(argument.toXML())
+        action.append(argumentList)
+        return action
         
     def addArgument(self, arg):
         self.argumentList[arg.name] = arg

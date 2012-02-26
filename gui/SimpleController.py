@@ -51,7 +51,7 @@ class ActionWindow(QWidget):
         vlay = QBoxLayout(QBoxLayout.TopToBottom)
         for arg in self.action.argumentList.values():            
             if arg.direction == arg.DIR_IN: continue
-            #print 'Argument: ', arg.name
+            print 'Argument: ', arg.name
             
             edit = QLineEdit()
             self.outs[arg.name] = edit

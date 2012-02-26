@@ -3,14 +3,20 @@
     This is simple SSDP implementation.
 """
 
-from twisted.internet.protocol import DatagramProtocol
-from twisted.internet.protocol import Protocol
 from twisted.internet import reactor
-import os,  uuid
+from twisted.internet.protocol import DatagramProtocol
+from twisted.web.server import Site
+from twisted.web.resource import Resource
+from twisted.internet import threads
+
+from upnpy import USER_AGENT
+from upnpy.xmlutil import DeviceDescriptionParser
+from threading import Lock
+import os, re
+import uuid
+import socket
 
 #from device import parseRootDeviceDesc
-from upnpy.parser import DeviceDescriptionParser
-from upnpy import USER_AGENT
 
 class SSDPUnicast(DatagramProtocol):
     packetHandler = None
@@ -33,7 +39,7 @@ class SSDPMulticast(DatagramProtocol):
         self.packetHandler.datagramReceived(datagram, addr)
 
         
-class SSDP(DatagramProtocol):
+class SSDP(object):
     
     SSDP_PORT = 1900
     SSDP_ADDR = "239.255.255.250"
@@ -52,6 +58,7 @@ class SSDP(DatagramProtocol):
     
     def __init__(self):
         self._cache = {}
+        self._localDevices = {}
         self.deviceFoundHandlers = []
         self.descriptionParser = DeviceDescriptionParser()
         
@@ -62,14 +69,18 @@ class SSDP(DatagramProtocol):
                                                  listenMultiple = True)
         self.multicast.setTTL(5)
         self.multicast.joinGroup(self.SSDP_ADDR)
+
+            
+        self.descServer = reactor.listenTCP(0, Site(DescriptionServerPage(self))) #@UndefinedVariable
+        #print 'Started description server on %s:%s' % (self.descServer.getHost().host, self.descServer.getHost().port)
         
     def startProtocol(self):
-        pass
+        pass    
         
     
     def datagramReceived(self, datagram, addr):
         lines = datagram.strip().split('\r\n')
-        #print "Server received: ", repr(addr), lines
+        print "Server received: ", repr(addr), lines
         
 
         try:        
@@ -82,6 +93,8 @@ class SSDP(DatagramProtocol):
                 data['type'] = SSDP.TYPE_NOTIFY
             elif 'M-SEARCH' in lines[0].upper():
                 data['type'] = SSDP.TYPE_SEARCH
+            else:
+                print 'Unknown packet type:', lines[0]
                 
             del lines[0]
     
@@ -93,25 +106,45 @@ class SSDP(DatagramProtocol):
             
             # Check if we've found the device
             if 'LOCATION' in data.keys():
-                
+#                if 'USN' in data.keys():                    
+#                    match = re.search('(uuid:[^:]*)', data['USN'])
+#                    print 'MATCH:', match.group(1)
+#                    if match != None and match.group(1) in self._localDevices.keys():
+#                        return # Its our local device so don't bother
+                    
                 #print addr, data
-                
-                location = data['LOCATION']
-                if location not in self._cache.keys():
+                def inner_parseDeviceInfo():
+                    location = data['LOCATION']                    
                     try: # Try to parse the device XML           
-                        #device = parseRootDeviceDesc(data)
                         device = self.descriptionParser.parse(location)
-                        
-                        self._cache[location] = device
-                        
-                        for handler in self.deviceFoundHandlers:
-                            handler(data, device)
-                    except Exception as e: # But if you cant
+                        return device
+                    except:
+                        pass
                         import traceback
                         import sys
                         traceback.print_exc(file=sys.stderr)
-                        print e
+                    return None
+                    
+
+                def inner_resultCallBack(device):
+                    if device != None and device.UDN not in self._cache.keys():
+                        self._cache[device.UDN] = device
+                        print self._cache
+                        for handler in self.deviceFoundHandlers:
+                            handler(data, device)
                 
+                
+                UDN = None
+                if 'USN' in data.keys():                    
+                    match = re.search('(uuid:[^:]*)', data['USN'])
+                    UDN = match.group(1)
+                print 'LOCATION:', data['LOCATION']
+#                if data['LOCATION'] not in self._cache.keys():
+                if UDN not in self._cache.keys():
+                    print UDN
+                    print self._cache.keys()
+                    threads.deferToThread(inner_parseDeviceInfo).addCallback(inner_resultCallBack)
+                                
         except Exception as e:
             print repr(e)
             
@@ -129,10 +162,36 @@ class SSDP(DatagramProtocol):
         #self.transport.write(msg, ('192.168.0.114', self.SSDP_PORT))
         #self.transport.write(msg, ('127.0.0.1', self.SSDP_PORT))
     
-    def alive(self, device, maxAge=1800):
-        print self.NOTIFY_TPL % (maxAge, device.rootDescURL, device.deviceType, USER_AGENT, 
-                                 device.UDN+"::"+device.deviceType)
-        pass
+    def alive(self, device, maxAge=1800, spreadInTime=True, spreadSpan=30):
+        
+        # TODO: poprawic aby uruchamial sie watek i rozkladal 
+        # komunikaty rownomiernie w czasie
+        print self.descServer.getHost().host
+        path = '/%s.xml' % device.UDN
+        rootDescURL = "http://%s:%s%s" % ("localhost", self.descServer.getHost().port, path)        
+        device.rootDescURL = rootDescURL
+        
+        self._localDevices[device.UDN] = device
+        
+        TPL = self.NOTIFY_TPL % (maxAge, rootDescURL, "%s", USER_AGENT, "%s")
+        addr = (self.SSDP_ADDR, self.SSDP_PORT)
+        self.unicast.write(TPL % ("upnp:rootdevice", device.UDN+"::"+device.deviceType), addr)
+        self.unicast.write(TPL % (device.deviceType, device.UDN+"::"+device.deviceType), addr)
+        
+        # TODO: notify about subdevices
+        #for device in device.devices.values():
+        #    self.unicast.write(TPL % (service.serviceType, device.UDN+"::"+service.serviceType), addr)
+            
+        for service in device.services.values():
+            self.unicast.write(TPL % (service.serviceType, device.UDN+"::"+service.serviceType), addr)
+        
+        #data = self.NOTIFY_TPL % (maxAge, rootDescURL, device.deviceType, USER_AGENT, 
+#                                 device.UDN+"::"+device.deviceType)
+#        self.unicast.write(data, (self.SSDP_ADDR, self.SSDP_PORT))
+        
+#        data = self.NOTIFY_TPL % (maxAge, rootDescURL, "upnp:rootdevice", USER_AGENT, 
+#                                 device.UDN+"::"+device.deviceType)
+#        self.unicast.write(data, (self.SSDP_ADDR, self.SSDP_PORT))
     
     def addHandler(self, handler):
         self.deviceFoundHandlers.append(handler)
@@ -141,6 +200,12 @@ class SSDP(DatagramProtocol):
         try: self.deviceFoundHandlers.remove(handler)
         except: pass
         
+    def _removeOldDevices(self):
+        # TODO: remove old devices
+        
+        # Call this again in 10.5 seconds
+        reactor.callLater(10.5, self._removeOldDevices) #@UndefinedVariable
+        
     def _genUUID(self, name):
         return uuid.uuid5(uuid.NAMESPACE_URL, name)
     
@@ -148,4 +213,32 @@ class SSDP(DatagramProtocol):
     @property
     def devices(self):
         return self._cache.values()
+    
+    @property
+    def localDevices(self):
+        return self._localDevices.values()
         
+        
+#class DescriptionServer(Protocol):
+#    def __init__(self, ssdp):
+#        self.ssdp = ssdp
+#        
+#    def connectionMade(self):
+#        print 'Connection made'
+#    
+#    def dataReceived(self, data):
+#        print 'Description server received:', data
+#        self.transport.write('Hello')        
+
+class DescriptionServerPage(Resource):
+    isLeaf = True
+    def __init__(self, ssdp):
+        self.ssdp = ssdp
+        
+    def render_GET(self, request):
+        print 'Desc server got request:', request.path.strip('xml/.')
+        device = self.ssdp._localDevices[request.path.strip('xml/.')]
+
+        from upnpy.xmlutil import genRootDesc
+        from lxml import etree            
+        return etree.tostring(genRootDesc(device))

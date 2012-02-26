@@ -6,6 +6,7 @@ Created on 25-02-2012
 
 from upnpy.ssdp import SSDP
 
+
 class DeviceManager(object):
     
     def __init__(self):
@@ -21,9 +22,10 @@ class DeviceManager(object):
         pass
     
     @property
-    def remoteDevices(self):
+    def devices(self):
         return self.ssdp.devices
     
+    @property
     def localDevices(self):
         return self._localDevices.values()
     

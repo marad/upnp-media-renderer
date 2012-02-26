@@ -25,3 +25,4 @@ if __name__ == "__main__":
     widget.setVisible(True)
     
     reactor.run() #@UndefinedVariable
+    reactor.getThreadPool().stop() #@UndefinedVariable

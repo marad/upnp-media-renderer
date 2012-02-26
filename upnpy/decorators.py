@@ -48,8 +48,11 @@ class ServiceInit(object):
                             setattr(arg, key, value)
                             
                         if arg.relatedStateVariable != None:
-                            stv = self.obj.stateVariables[arg.relatedStateVariable]
-                            arg.relatedStateVariableRef = stv
+                            if not arg.relatedStateVariable in self.obj.stateVariables.keys():
+                                raise Exception("State variable '%s' doesn't exist!" % arg.relatedStateVariable)
+                            else:
+                                stv = self.obj.stateVariables[arg.relatedStateVariable]
+                                arg.relatedStateVariableRef = stv
     
                         argList[name] = arg
                 else:
@@ -89,8 +92,8 @@ class MyService(Service):
     def __init__(self):
         self.addStateVariable(
                 StateVariable(
-                        name = 'testVar',
-                        dataType = StateVariable.TYPE_STRING))
+                        name='testVar',
+                        dataType=StateVariable.TYPE_STRING))
         self.addStateVariable(descDict={ 
                 'name'     : 'secVar',
                 'dataType' : StateVariable.TYPE_INT,
@@ -120,27 +123,27 @@ def showProps(o, prefix=''):
         if isinstance(o, list):
             #log (prefix+ '\t'+ o)
             for object in o:
-                showProps(object, prefix=prefix+'\t\t')
+                showProps(object, prefix=prefix + '\t\t')
         elif isinstance(o, dict):
             #log(prefix + k)
             for key, value in zip(o.keys(), o.values()):
-                log(prefix+'\t'+key+ ':')
-                showProps(value, prefix=prefix+'\t\t')
+                log(prefix + '\t' + key + ':')
+                showProps(value, prefix=prefix + '\t\t')
         return
     
     for k, v in zip(v.keys(), v.values()):
         try:
             if isinstance(v, list):
-                log (prefix+ '\t'+ k)
+                log (prefix + '\t' + k)
                 for object in v:
-                    showProps(object, prefix=prefix+'\t\t')
+                    showProps(object, prefix=prefix + '\t\t')
             elif isinstance(v, dict):
                 log(prefix + k)
                 for key, value in zip(v.keys(), v.values()):
-                    log(prefix+'\t'+key+ ':')
-                    showProps(value, prefix=prefix+'\t\t')
+                    log(prefix + '\t' + key + ':')
+                    showProps(value, prefix=prefix + '\t\t')
             else:
-                log( prefix + k + ' = ' + v )
+                log(prefix + k + ' = ' + v)
         except Exception as e:
             #print e
             pass
@@ -150,17 +153,17 @@ def show(o, prefix=''):
         v = vars(o)
         for key, val in zip(v.keys(), v.values()):
             log(prefix + key)
-            if val != None: show(val, prefix+'\t')
+            if val != None: show(val, prefix + '\t')
     except:
         if isinstance(o, list):
             #log (prefix+ '\t'+ o)
             for object in o:
-                showProps(object, prefix=prefix+'\t\t')
+                showProps(object, prefix=prefix + '\t\t')
         elif isinstance(o, dict):
             #log(prefix + k)
             for key, value in zip(o.keys(), o.values()):
-                log(prefix+'\t'+key+ ':')
-                showProps(value, prefix=prefix+'\t\t')
+                log(prefix + '\t' + key + ':')
+                showProps(value, prefix=prefix + '\t\t')
         else:
             log(prefix + repr(o))
         
@@ -168,3 +171,6 @@ srv = MyService()
 show(srv)
 
 print srv.stateVariables['secVar'].allowedValueList
+
+from lxml import etree
+print etree.tostring(srv.genSCPD(), pretty_print=True)

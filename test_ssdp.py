@@ -20,6 +20,8 @@ from twisted.internet.endpoints import TCP4ServerEndpoint
 from PyQt4.QtGui import QTextEdit
 from PyQt4.QtCore import SIGNAL, SLOT, Qt
 
+from lxml import etree
+
 global edit
 edit = QTextEdit()
 
@@ -60,19 +62,26 @@ def deviceFoundHandler(headers, device):
     log("Found device: " + device.deviceType) # + "(" + device.UDN + ")")
     
     if device.friendlyName == "GUPnP Network Light":
+        xml = device.genDeviceDesc()
+        log(etree.tostring(xml, pretty_print=True))
         
         service = device.services.values()[1]
-        #print service
-        action = service.actions.values()[0]
-    
-        print service.serviceType
-        print service.host
-        print service.port
-    
-        soap = SOAP()
         
-        print soap.invokeActionByName(service, "SetTarget",
-                          {'NewTargetValue':'false'})
+        log('-----------------------------------')
+        log('SCPD')
+        log('-----------------------------------')
+        log(etree.tostring(service.genSCPD(), pretty_print=True))
+        #print service
+        #action = service.actions.values()[0]
+    
+        #print service.serviceType
+        #print service.host
+        #print service.port
+    
+        #soap = SOAP()
+        
+        #print soap.invokeActionByName(service, "SetTarget",
+        #                  {'NewTargetValue':'false'})
     
         #log( soap._genRequest('router:1780', service, action) )
     
@@ -96,6 +105,19 @@ def search():
     global edit
     edit.setText("")
     ssdp.search(target="upnp:rootdevice", mx=1)
+
+def advertise():
+    
+    from upnpy.device import Device
+    
+    d = Device()
+    d.deviceType = 'urn:schemas-upnp-org:device:TestDevice:1'
+    d.friendlyName = 'My Test Device'
+    d.manufacturer = "morti"
+    d.modelName = "Test Device"
+    d.UDN = "uuid:e611e33b-a51f-4025-b5c3-e9a4ca74f75b"
+    d.rootDescURL = 'http://localhost/getxml'
+    ssdp.alive(d, maxAge=10)
 
 if __name__ == "__main__":
     print "Testing SSDP..."
@@ -125,16 +147,20 @@ if __name__ == "__main__":
     searchButton = QPushButton("Search")
     QWidget.connect(searchButton, SIGNAL("clicked()"), search)
     
+    adButton = QPushButton('Advertise Device')
+    QWidget.connect(adButton, SIGNAL('clicked()'), advertise) 
+    
     global edit
     edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)    
     
     layout = QBoxLayout(QBoxLayout.TopToBottom)
     layout.addWidget(edit, 3)
     layout.addWidget(searchButton)
+    layout.addWidget(adButton)
     layout.addWidget(closeButton)
     widget.setLayout(layout)
         
     
     reactor.run() #@UndefinedVariable
-    
+    reactor.getThreadPool().stop() #@UndefinedVariable
     print "Zamykam aplikacje"

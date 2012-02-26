@@ -10,6 +10,20 @@ import urllib2
 from lxml import etree
 from upnpy.device import Device, Service, Icon, StateVariable, Action, ActionArgument
 
+def genRootDesc(device):
+    root = etree.Element('root', xmlns="urn:schemas-upnp-org:device-1-0")
+    specVersion = etree.Element('specVersion')
+    major = etree.Element('major')
+    major.text = '1'
+    minor = etree.Element('minor')
+    minor.text = '0'
+    
+    specVersion.append(major)
+    specVersion.append(minor)
+    root.append(specVersion)
+    root.append(device.genDeviceDesc())
+    return root
+
 class DeviceDescriptionParser(object):
     
     def __init__(self):
@@ -123,7 +137,7 @@ class DeviceDescriptionParser(object):
 #        rootDeviceDescURL = data['LOCATION']
         
         response = urllib2.urlopen(rootDeviceDescURL)
-        xml = response.read()    
+        xml = response.read()
         doc = etree.fromstring(xml)
             
         
@@ -134,5 +148,3 @@ class DeviceDescriptionParser(object):
         device = self._createDevice(baseURL, deviceNode)
         device.rootDescURL = rootDeviceDescURL
         return device
-
-      
