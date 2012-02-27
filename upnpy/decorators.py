@@ -88,6 +88,12 @@ def Argument(name,
 
 class MyService(Service):
     
+#    @StateVariable(dataType="string")
+#    testVar = None
+
+#    @StateVariable(dataType="int", allowedValueList=[123, 412, 251])
+#    secVar = None
+    
     @ServiceInit
     def __init__(self):
         self.addStateVariable(
