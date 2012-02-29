@@ -86,7 +86,7 @@ class DeviceDescriptionParser(object):
         service.controlURL  = self._xpath(serviceNode, 'dev:controlURL/text()')
         service.eventSubURL = self._xpath(serviceNode, 'dev:eventSubURL/text()')
         
-        response = urllib2.urlopen(service.SCPDURL)
+        response = urllib2.urlopen(service.fullSCPDURL)
         doc = etree.fromstring(response.read())
         
         for variableNode in doc.xpath('srv:serviceStateTable/srv:stateVariable', namespaces=self.namespaces):
@@ -138,13 +138,16 @@ class DeviceDescriptionParser(object):
         
         response = urllib2.urlopen(rootDeviceDescURL)
         xml = response.read()
-        doc = etree.fromstring(xml)
+        try:
+            doc = etree.fromstring(xml)
             
         
-        #deviceNode = doc.xpath("dev:device", namespaces=self.namespaces)
-        deviceNode = self._xpath(doc, 'dev:device')
-        baseURL = re.search('^[^:]+://[^/]*', rootDeviceDescURL).group(0)
-        
-        device = self._createDevice(baseURL, deviceNode)
-        device.rootDescURL = rootDeviceDescURL
-        return device
+            #deviceNode = doc.xpath("dev:device", namespaces=self.namespaces)
+            deviceNode = self._xpath(doc, 'dev:device')
+            baseURL = re.search('^[^:]+://[^/]*', rootDeviceDescURL).group(0)
+            
+            device = self._createDevice(baseURL, deviceNode)
+            device.rootDescURL = rootDeviceDescURL
+            return device
+        except:
+            return None

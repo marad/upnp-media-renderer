@@ -71,7 +71,7 @@ class SSDP(object):
         self.multicast.joinGroup(self.SSDP_ADDR)
 
             
-        self.descServer = reactor.listenTCP(0, Site(DescriptionServerPage(self))) #@UndefinedVariable
+        self.descServer = reactor.listenTCP(12345, Site(DescriptionServerPage(self))) #@UndefinedVariable
         #print 'Started description server on %s:%s' % (self.descServer.getHost().host, self.descServer.getHost().port)
         
     def startProtocol(self):
@@ -80,7 +80,8 @@ class SSDP(object):
     
     def datagramReceived(self, datagram, addr):
         lines = datagram.strip().split('\r\n')
-        print "Server received: ", repr(addr), lines
+        #print "Server received: ", repr(addr), lines
+        print "Server received: ", lines
         
 
         try:        
@@ -167,9 +168,11 @@ class SSDP(object):
         # TODO: poprawic aby uruchamial sie watek i rozkladal 
         # komunikaty rownomiernie w czasie
         print self.descServer.getHost().host
-        path = '/%s.xml' % device.UDN
-        rootDescURL = "http://%s:%s%s" % ("localhost", self.descServer.getHost().port, path)        
+        path = '/device/%s.xml' % device.UDN
+        baseURL = "http://%s:%s" % ('localhost', self.descServer.getHost().port)
+        rootDescURL = "%s%s" % (baseURL, path)        
         device.rootDescURL = rootDescURL
+        device.baseURL = baseURL
         
         self._localDevices[device.UDN] = device
         
@@ -177,12 +180,14 @@ class SSDP(object):
         addr = (self.SSDP_ADDR, self.SSDP_PORT)
         self.unicast.write(TPL % ("upnp:rootdevice", device.UDN+"::"+device.deviceType), addr)
         self.unicast.write(TPL % (device.deviceType, device.UDN+"::"+device.deviceType), addr)
+        self.unicast.write(TPL % (device.UDN, device.UDN+"::"+device.deviceType), addr)
         
         # TODO: notify about subdevices
         #for device in device.devices.values():
         #    self.unicast.write(TPL % (service.serviceType, device.UDN+"::"+service.serviceType), addr)
             
         for service in device.services.values():
+            service.SCPDURL = '/service/%s.xml' % (service.serviceId)
             self.unicast.write(TPL % (service.serviceType, device.UDN+"::"+service.serviceType), addr)
         
         #data = self.NOTIFY_TPL % (maxAge, rootDescURL, device.deviceType, USER_AGENT, 
@@ -230,15 +235,37 @@ class SSDP(object):
 #        print 'Description server received:', data
 #        self.transport.write('Hello')        
 
+from upnpy.xmlutil import genRootDesc
+from lxml import etree
+
 class DescriptionServerPage(Resource):
     isLeaf = True
     def __init__(self, ssdp):
         self.ssdp = ssdp
         
     def render_GET(self, request):
-        print 'Desc server got request:', request.path.strip('xml/.')
-        device = self.ssdp._localDevices[request.path.strip('xml/.')]
+        print 'Desc server got request:', request.path
+        
+        match = re.search('/([^/]+)/([^.]+).xml', request.path)
+        if match == None:
+            return "ERROR"
+        
+        resType = match.group(1)
+        resId = match.group(2)
+                
+        
+        if resType == 'device':
+            request.responseHeaders.setRawHeaders('content-type', ['text/xml'])            
 
-        from upnpy.xmlutil import genRootDesc
-        from lxml import etree            
-        return etree.tostring(genRootDesc(device))
+            device = self.ssdp._localDevices[resId]
+            return etree.tostring(genRootDesc(device))
+    
+        if resType == 'service':
+            request.responseHeaders.setRawHeaders('content-type', ['text/xml'])
+            
+            for device in self.ssdp._localDevices.values():
+                if resId in device.services.keys():
+                    service = device.services[resId]
+                    return etree.tostring(service.genSCPD())
+                    
+        return "NUTHING"

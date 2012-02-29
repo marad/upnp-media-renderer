@@ -11,12 +11,13 @@ from upnpy.util import Entity
 def _createNodesFromAttrs(obj, attrList, parent):
     #nodes = []
     for name in attrList:
-        value = getattr(obj, name)
-        if value == None:
-            continue
-        node = etree.Element(name)
-        node.text = str(value)
-        parent.append(node)
+        if hasattr(obj, name):
+            value = getattr(obj, name)
+            if value == None:
+                continue
+            node = etree.Element(name)
+            node.text = str(value)
+            parent.append(node)
         #nodes.append(node)
         
     #return nodes
@@ -77,29 +78,37 @@ class Device(object):
         self.baseURL = None
         self.rootDescURL = None
         #self.location = deviceDesc.location
+    
+    def addService(self, service):
+        service.device = self
+        self.services[service.serviceId] = service
 
     def genDeviceDesc(self):
         node = etree.Element('device')
         iconList = etree.Element('iconList')
-        devList = etree.Element('devices')
-        srvList = etree.Element('services')
+        devList = etree.Element('deviceList')
+        srvList = etree.Element('serviceList')
                 
         _createNodesFromAttrs(self, ['deviceType', 'friendlyName', 'manufacturer',
                                      'manufacturerURL', 'modelDescription', 'modelNumber',
                                      'modelName', 'modelURL', 'serialNumber', 'UDN', 'UPC',
                                      'presentationURL'],
                               node)
-        for icon in self.icons:
-            iconList.append(icon.toXML())
-        node.append(iconList)
         
-        for device in self.devices.values():
-            devList.append(device.genDeviceDesc())
-        node.append(devList)
-            
-        for service in self.services.values():
-            srvList.append(service.toXML())
-        node.append(srvList)
+        if len(self.icons) > 0:
+            for icon in self.icons:
+                iconList.append(icon.toXML())
+            node.append(iconList)
+        
+        if len(self.devices) > 0:
+            for device in self.devices.values():
+                devList.append(device.genDeviceDesc())
+            node.append(devList)
+                
+        if len(self.services) > 0:
+            for service in self.services.values():
+                srvList.append(service.toXML())
+            node.append(srvList)
             
         return node
         
@@ -118,7 +127,8 @@ class Service(object):
         self.serviceId = None
         self.controlURL = None
         self.eventSubURL = None
-        self._SCPDURL = None
+        #self._SCPDURL = None
+        self.SCPDURL = None
         #self.actions, self.stateVariables = _parseSCPD(self.device.location.rstrip('/') + '/' + self.SCPDURL.lstrip('/'))
         self.actions = {}
         self.stateVariables = {}
@@ -129,7 +139,7 @@ class Service(object):
         _createNodesFromAttrs(self, ['serviceType', 'serviceId', 'controlURL', 'eventSubURL'], service)
         
         scpdNode = etree.Element('SCPDURL')
-        scpdNode.text = self.SCPDPath
+        scpdNode.text = self.SCPDURL
         service.append(scpdNode)
         
         return service
@@ -149,13 +159,15 @@ class Service(object):
         actionList = etree.Element('actionList')
         serviceStateTable = etree.Element('serviceStateTable')
         
-        for action in self.actions.values():
-            actionList.append(action.toXML())
-        scpd.append(actionList)
+        if len(self.actions) > 0:
+            for action in self.actions.values():
+                actionList.append(action.toXML())
+            scpd.append(actionList)
         
-        for variable in self.stateVariables.values():
-            serviceStateTable.append(variable.toXML())
-        scpd.append(serviceStateTable)
+        if len(self.stateVariables) > 0:
+            for variable in self.stateVariables.values():
+                serviceStateTable.append(variable.toXML())
+            scpd.append(serviceStateTable)
         
         return scpd
         
@@ -180,18 +192,23 @@ class Service(object):
         if match == None:
             return self.baseURL
         else:
-            return match.group(0)
+            return match.group(0)     
      
-    @property
-    def SCPDURL(self):
-        return self._SCPDURL 
-    
-    @SCPDURL.setter
-    def SCPDURL(self, val):
-        base = self._findBaseUrl(val)
-        self.SCPDPath = val
-        self._SCPDURL = base.rstrip('/') + '/' + val.lstrip('/')
+#    @property
+#    def SCPDURL(self):
+#        return self._SCPDURL 
+#    
+#    @SCPDURL.setter
+#    def SCPDURL(self, val):
+#        base = self._findBaseUrl(val)
+#        self.SCPDPath = val
+#        self._SCPDURL = base.rstrip('/') + '/' + val.lstrip('/')
         
+    
+    @property
+    def fullSCPDURL(self):
+         return self.baseURL.rstrip('/') + '/' + self.SCPDURL.lstrip('/')
+     
     @property
     def host(self):
         try:
@@ -275,13 +292,12 @@ class StateVariable(object):
                  allowedValueRangeMax = None,
                  allowedValueRangeStep = None,
                  sendEvents = None,
-                 multicast = None):
+                 multicast = None,
+                 **kwargs):
         self.name = name
         self.dataType = dataType
         self.defaultValue = defaultValue
-        if allowedValueList == None:
-            self.allowedValueList = []
-        else:
+        if not allowedValueList == None:
             self.allowedValueList = allowedValueList
         self.allowedValueRange = Entity()
         self.allowedValueRange.min = allowedValueRangeMin
@@ -291,42 +307,53 @@ class StateVariable(object):
         self.multicast = multicast
         
         self.value = self.defaultValue
+        
+        for k, v in zip(kwargs.keys(), kwargs.values()):
+            setattr(self, k, v)
 
     def toXML(self):
         var = etree.Element('stateVariable')
         if self.sendEvents != None:
             var.set('sendEvents', self.sendEvents)
+        else:
+            var.set('sendEvents', "no")
         
         if self.multicast != None:
             var.set('multicast', self.multicast)
         
         _createNodesFromAttrs(self, ['name', 'dataType', 'defaultValue'], var)
-        
-        valueList = etree.Element('allowedValueList')
-        for value in self.allowedValueList:
-            node = etree.Element('allowedValue')
-            node.text = str(value)
-            valueList.append(node)
-        
-        var.append(valueList)
+                
+        if hasattr(self, 'allowedValueList'):
+            valueList = etree.Element('allowedValueList')
+            for value in self.allowedValueList:
+                node = etree.Element('allowedValue')
+                node.text = str(value)
+                valueList.append(node)
+            
+            var.append(valueList)
         
         valueRange = etree.Element('allowedValueRange')
+        addValueRange = False
         if self.allowedValueRange.max:
             max = etree.Element('maximum')
             max.text = self.allowedValueRange.max
-            valueRange.append(max) 
+            valueRange.append(max)
+            addValueRange = True 
         
         if self.allowedValueRange.min:
             min = etree.Element('minimum')
             min.text = self.allowedValueRange.min
             valueRange.append(min)
+            addValueRange = True
         
         if self.allowedValueRange.step:
             step = etree.Element('step')
             step.text = self.allowedValueRange.step
             valueRange.append(step)
+            addValueRange = True
         
-        var.append(valueRange)
+        if addValueRange:
+            var.append(valueRange)
         return var
         
 ########################################################################
@@ -367,9 +394,10 @@ class Action(object):
         _createNodesFromAttrs(self, ['name'], action)
         argumentList = etree.Element('argumentList')
         
-        for argument in self.argumentList.values():
-            argumentList.append(argument.toXML())
-        action.append(argumentList)
+        if len(self.argumentList):
+            for argument in self.argumentList.values():
+                argumentList.append(argument.toXML())
+            action.append(argumentList)
         return action
         
     def addArgument(self, arg):

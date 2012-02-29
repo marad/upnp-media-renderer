@@ -61,16 +61,16 @@ def showProps(o, prefix=''):
 def deviceFoundHandler(headers, device):
     log("Found device: " + device.deviceType) # + "(" + device.UDN + ")")
     
-    if device.friendlyName == "GUPnP Network Light":
+    if device.friendlyName == "GUPnP Network Light" or True:
         xml = device.genDeviceDesc()
         log(etree.tostring(xml, pretty_print=True))
         
-        service = device.services.values()[1]
+        #service = device.services.values()[1]
         
         log('-----------------------------------')
         log('SCPD')
         log('-----------------------------------')
-        log(etree.tostring(service.genSCPD(), pretty_print=True))
+        #log(etree.tostring(service.genSCPD(), pretty_print=True))
         #print service
         #action = service.actions.values()[0]
     
@@ -117,7 +117,15 @@ def advertise():
     d.modelName = "Test Device"
     d.UDN = "uuid:e611e33b-a51f-4025-b5c3-e9a4ca74f75b"
     d.rootDescURL = 'http://localhost/getxml'
-    ssdp.alive(d, maxAge=10)
+    
+    from upnpy.decorators import MyService
+    s = MyService()
+    s.serviceType = 'urn:schemas-upnp-org:service:TestService:1'
+    s.serviceId = 'AddService'
+    s.controlURL = '/control/service'
+    s.eventSubURL = '/event/sub'
+    d.addService(s)
+    ssdp.alive(d, maxAge=20)
 
 if __name__ == "__main__":
     print "Testing SSDP..."
@@ -130,7 +138,7 @@ if __name__ == "__main__":
     #ssdp.search(target='upnp:rootdevice', mx=1)
     #ssdp.search()    
     #ssdp.search(target='urn:schemas-upnp-org:service:SwitchPower:1')
-    ssdp.search(target='urn:schemas-upnp-org:device:DimmableLight:1')
+    #ssdp.search(target='urn:schemas-upnp-org:device:DimmableLight:1')
     #ssdp.search(target='urn:schemas-upnp-org:device:InternetGatewayDevice:1')
     
     #ssdp.search()

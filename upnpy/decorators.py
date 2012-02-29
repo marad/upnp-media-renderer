@@ -5,7 +5,7 @@ Created on 25-02-2012
 '''
 
 from upnpy.device import Action as ServiceAction
-from upnpy.device import StateVariable
+from upnpy.device import StateVariable as ServiceStateVariable
 from upnpy.device import ActionArgument
 from upnpy.device import Service
 from inspect import getmembers, getargspec
@@ -25,7 +25,7 @@ class ServiceInit(object):
             if k.startswith("__"): continue
             
             # If they have attribute 'isAction' set to True
-            if hasattr(v, 'isAction') and v.isAction:
+            if hasattr(v, '__isAction__') and v.__isAction__:
                 print 'Found action:', v
                 
                 # Begin creating action object
@@ -55,13 +55,19 @@ class ServiceInit(object):
                                 arg.relatedStateVariableRef = stv
     
                         argList[name] = arg
+                    
+                    #delattr(v, 'argList')
                 else:
                     if functionArgumentCount > 0:
                         raise Exception("(%s, %s):Action in-arguments must match method arguments!" % (self.cls, v.__func__.__name__))
                 
+                #delattr(v, '__isAction__')
                 action = ServiceAction(name=v.__func__.__name__,
                                        argumentList=argList)
                 self.obj.addAction(action)
+            
+            if hasattr(v, '__var__'):
+                print 'Found state variable:', v
     
     def __get__(self, obj, cls):
         self.obj = obj
@@ -71,7 +77,7 @@ class ServiceInit(object):
 
 
 def Action(func):
-    func.isAction = True    
+    func.__isAction__ = True    
     return func
     
 def Argument(name,
@@ -85,36 +91,44 @@ def Argument(name,
         return func
     return inner
 
+#def StateVariable(name,
+#                  dataType,
+#                  **kwargs):
+#    def inner(func):
+#        func.__var__ = ServiceStateVariable(
+#                name=name, dataType=dataType, **kwargs)
+#        return func
+#    return inner
+
 
 class MyService(Service):
-    
-#    @StateVariable(dataType="string")
-#    testVar = None
-
-#    @StateVariable(dataType="int", allowedValueList=[123, 412, 251])
-#    secVar = None
-    
+        
     @ServiceInit
-    def __init__(self):
+    def __init__(self):    
         self.addStateVariable(
-                StateVariable(
-                        name='testVar',
-                        dataType=StateVariable.TYPE_STRING))
+                ServiceStateVariable(
+                        name='A',
+                        dataType=ServiceStateVariable.TYPE_INT,
+                        defaultValue=0))
         self.addStateVariable(descDict={ 
-                'name'     : 'secVar',
-                'dataType' : StateVariable.TYPE_INT,
-                'allowedValueList' : [1, 3, 13]})
+                'name'     : 'B',
+                'dataType' : ServiceStateVariable.TYPE_INT,
+                'defaultValue': 0})
+        self.addStateVariable(descDict={
+                'name': 'result',
+                'dataType': ServiceStateVariable.TYPE_INT})
         
         
     @Action
-    @Argument('arg1', 'in', 'testVar', other='info')
-    @Argument('arg2', 'in', 'secVar')
-    @Argument('shitOut', 'out', 'secVar')
-    def myAction(self, arg1, arg2):
-        print arg1, arg2
+    @Argument('argA', 'in', 'A', other='info')
+    @Argument('argB', 'in', 'B')
+    @Argument('result', 'out', 'result')
+    def myAction(self, argA, argB):
+        print "%s + %s = %s" % (argA, argB, argA + argB)
+        return argA + argB
     
     @Action
-    def notAction(self):
+    def dummyAction(self):
         pass
 
 def log(x):
@@ -173,10 +187,10 @@ def show(o, prefix=''):
         else:
             log(prefix + repr(o))
         
-srv = MyService()
-show(srv)
+#srv = MyService()
+#show(srv)
 
-print srv.stateVariables['secVar'].allowedValueList
+#print srv.stateVariables['secVar'].allowedValueList
 
-from lxml import etree
-print etree.tostring(srv.genSCPD(), pretty_print=True)
+#from lxml import etree
+#print etree.tostring(srv.genSCPD(), pretty_print=True)
