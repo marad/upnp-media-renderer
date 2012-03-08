@@ -9,6 +9,3 @@ System requirements:
 Installation:
 	Ubuntu:
 		sudo apt-get install python-twisted python-qt4 python-lxml
-
-	Fedora:
-		?
