@@ -77,12 +77,20 @@ class Device(object):
         self.presentationURL = None
         self.baseURL = None
         self.rootDescURL = None
+        self.embedded = False
         #self.location = deviceDesc.location
     
+    def addDevice(self, device):
+        device.parent = self
+        self.devices[device.UDN] = device
+        
     def addService(self, service):
-        service.device = self
+        service.parent = self
         self.services[service.serviceId] = service
 
+    def addIcon(self, icon):
+        self.icons.append(icon)
+        
     def genDeviceDesc(self):
         node = etree.Element('device')
         iconList = etree.Element('iconList')
@@ -299,6 +307,9 @@ class StateVariable(object):
         self.defaultValue = defaultValue
         if not allowedValueList == None:
             self.allowedValueList = allowedValueList
+        else:
+            self.allowedValueList = set()
+                 
         self.allowedValueRange = Entity()
         self.allowedValueRange.min = allowedValueRangeMin
         self.allowedValueRange.max = allowedValueRangeMax
@@ -310,6 +321,9 @@ class StateVariable(object):
         
         for k, v in zip(kwargs.keys(), kwargs.values()):
             setattr(self, k, v)
+            
+    def addAllowedValue(self, value):
+        self.allowedValueList.add(value)    
 
     def toXML(self):
         var = etree.Element('stateVariable')

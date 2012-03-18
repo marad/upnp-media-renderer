@@ -14,15 +14,15 @@ import qt4reactor
 qt4reactor.install(app)
 from twisted.internet import reactor
 ######################################################
-    
+
 from upnpy.ssdp import SSDP
 from upnpy.soap import SOAPClient
 from gui.SimpleController import SimpleController
 
 if __name__ == "__main__":
-    
-    widget = SimpleController()    
+
+    widget = SimpleController()
     widget.setVisible(True)
-    
-    reactor.run() #@UndefinedVariable
-    reactor.getThreadPool().stop() #@UndefinedVariable
+
+    reactor.run()         #@UndefinedVariable
+    reactor.getThreadPool().stop()        #@UndefinedVariable
