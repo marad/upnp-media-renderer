@@ -8,7 +8,6 @@ from urllib import urlopen
 from lxml import etree
 from upnpy.xmlutil import XmlDescriptionParser, Entity
 
-
 ns = {
     'dev':'urn:schemas-upnp-org:device-1-0',
     'srv':'urn:schemas-upnp-org:service-1-0'
