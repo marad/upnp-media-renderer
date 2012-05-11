@@ -5,7 +5,7 @@ Created on 24-02-2012
 @author: morti
 '''
 
-from upnpy.ssdp import SSDP
+#from upnpy.ssdp import SSDP
 from upnpy.soap import SOAPClient
 
 from PyQt4.QtGui import QWidget, QBoxLayout, QTreeWidget, QTreeWidgetItem, QLabel, QTextEdit
@@ -90,12 +90,16 @@ class SimpleController(QWidget):
     def __init__(self):
         QWidget.__init__(self)        
         self.knownDevices = []
-        self.ssdp = SSDP()
-        self.ssdp.addDeviceHandler(self.deviceFound)
-        self.ssdp.addServiceHandler(lambda x, y: self.addService(y))
-        self.ssdp.listen()
+        #self.ssdp = SSDP()
+        #self.ssdp.addDeviceHandler(self.deviceFound)
+        #self.ssdp.addServiceHandler(lambda x, y: self.addService(y))
+        #self.ssdp.listen()
         #self.ssdp.search(target='upnp:rootdevice', mx=1)
-        self.ssdp.search()
+        #self.ssdp.search()
+        from upnpy import discovery
+        discovery.addDeviceHandler(self.deviceFound)
+        discovery.addServiceHandler(lambda x, y: self.addService(y))
+        discovery.search()
         self.act = None
         
         self.devMap = {}

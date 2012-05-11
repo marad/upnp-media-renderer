@@ -92,7 +92,7 @@ class XmlDescriptionBuilder(object):
     deviceTypeMatcher = re.compile(r"^(?:urn:[^:]+:device:)|(?:uuid:.+)")    
     serviceTypeMatcher = re.compile(r"^urn:[^:]+:service:")
     usnMatcher = re.compile(r"^(?P<uuid>uuid:[^:]+)(?:::)?(?P<type>.*)$")
-    baseURLMatcher = re.compile(r"^(?P<baseURL>[^:]+://[^:]+:[0-9]+/).+$")
+    baseURLMatcher = re.compile(r"^(?P<baseURL>[^:]+://[^:]+:[0-9]+).*$")
     
     maxAgeMatcher = re.compile(r"max-age=(?P<maxAge>[0-9]+)")
     

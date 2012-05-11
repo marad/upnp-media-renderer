@@ -3,7 +3,7 @@ Created on 24-02-2012
 
 @author: morti
 '''
-from upnpy import USER_AGENT
+from consts import USER_AGENT
 from time import strftime, gmtime
 
 from twisted.internet.protocol import Protocol

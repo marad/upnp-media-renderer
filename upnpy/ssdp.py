@@ -9,7 +9,7 @@ from twisted.web.server import Site
 from twisted.web.resource import Resource
 from twisted.internet import threads
 
-from upnpy import USER_AGENT
+from consts import USER_AGENT
 from upnpy.xmlutil import XmlDescriptionBuilder
 from threading import Lock
 from upnpy.device import Device, Service
@@ -17,7 +17,8 @@ import os, re
 import uuid
 import socket
 import traceback
-import sys
+import sys, time
+from util import RegexUtil
 
 #from device import parseRootDeviceDesc
 
@@ -41,7 +42,10 @@ class SSDPMulticast(DatagramProtocol):
         #print "Multicast data!", datagram
         self.packetHandler.datagramReceived(datagram, addr)
 
-        
+     
+#######################################################################################
+#######################################################################################
+   
 class SSDP(object):
     
     SSDP_PORT = 1900
@@ -76,7 +80,7 @@ class SSDP(object):
         self.multicast.joinGroup(self.SSDP_ADDR)
 
             
-        self.descServer = reactor.listenTCP(12345, Site(DescriptionServerPage(self))) #@UndefinedVariable
+        self.descServer = reactor.listenTCP(0, Site(DescriptionServerPage(self))) #@UndefinedVariable
         #print 'Started description server on %s:%s' % (self.descServer.getHost().host, self.descServer.getHost().port)
         
     def startProtocol(self):
@@ -109,11 +113,14 @@ class SSDP(object):
                     name, value = field.split(':', 1)
                     name, value = [name.upper(), value.strip()]
                     data[name] = value
-            # Check if we've found the device
-            if 'LOCATION' in data.keys():          
-                #print addr, data
-                #print data['TYPE'], data.keys()
-                #if 'USN' in data.keys(): print data['USN']
+                
+            
+            UDN = None    
+            if 'USN' in data.keys():
+                UDN = RegexUtil.getUUID(data['USN'])
+                
+            # Check if we've found new device
+            if 'LOCATION' in data.keys() and UDN not in self._cache.keys():
                 def inner_parseDeviceInfo():
                     location = data['LOCATION']                    
                     try: # Try to parse the device XML           
@@ -127,7 +134,7 @@ class SSDP(object):
                 def inner_resultCallBack(entity):
                     if entity != None:
                         if isinstance(entity, Device) and entity.UDN not in self._cache.keys():
-                            # save device in cache                            
+                            # save device in cache
                             self._cache[entity.UDN] = entity
                             
                             # check if there are some lost embedded devices for this one
@@ -187,7 +194,15 @@ class SSDP(object):
                     #print UDN
                     #print self._cache.keys()
                 threads.deferToThread(inner_parseDeviceInfo).addCallback(inner_resultCallBack)
-                                
+            
+            
+            # Refresh age information
+            if 'CACHE-CONTROL' in data.keys() and UDN in self._cache.keys():
+                maxAge = RegexUtil.getMaxAge(data['CACHE-CONTROL']);
+                self._cache[UDN].maxAge = time.time() + maxAge
+                print self._cache[UDN].maxAge
+                
+                                               
         except Exception as e:
             print repr(e)
             
@@ -258,6 +273,18 @@ class SSDP(object):
         # TODO: remove old devices
         
         # Call this again in 10.5 seconds
+        
+        toRemove = []
+        t = time.time()
+        for udn, dev in self._cache.iteritems():
+            if t > dev.maxAge:
+                toRemove.append(udn)
+        
+        for udn in toRemove:
+            # TODO: inform about removing device
+            print '===== REMOVING DEVICE', self._cache[udn].friendlyName, '! ====='
+            del self._cache[udn]
+            
         reactor.callLater(10.5, self._removeOldDevices) #@UndefinedVariable
         
     def _genUUID(self, name):
@@ -273,16 +300,12 @@ class SSDP(object):
         return self._localDevices.values()
         
         
-#class DescriptionServer(Protocol):
-#    def __init__(self, ssdp):
-#        self.ssdp = ssdp
-#        
-#    def connectionMade(self):
-#        print 'Connection made'
-#    
-#    def dataReceived(self, data):
-#        print 'Description server received:', data
-#        self.transport.write('Hello')        
+    
+
+
+#######################################################################################
+#######################################################################################
+       
 
 from lxml import etree
 from xmlutil import genRootDesc

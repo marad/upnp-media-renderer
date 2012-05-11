@@ -7,16 +7,16 @@ Created on 24-02-2012
 
 
 # THIS BLOCK NEEDS TO BE EXECUTED BEFORE ANYTHING ELSE
-import sys
-from PyQt4.QtGui import QApplication, QWidget, QPushButton, QBoxLayout, QSizePolicy
-app = QApplication(sys.argv)
-import qt4reactor
-qt4reactor.install(app)
-from twisted.internet import reactor
+#import sys
+#from PyQt4.QtGui import QApplication, QWidget, QPushButton, QBoxLayout, QSizePolicy
+#app = QApplication(sys.argv)
+#import qt4reactor
+#qt4reactor.install(app)
+#from twisted.internet import reactor
 ######################################################
 
-from upnpy.ssdp import SSDP
-from upnpy.soap import SOAPClient
+import upnpy
+
 from gui.SimpleController import SimpleController
 
 if __name__ == "__main__":
@@ -24,5 +24,6 @@ if __name__ == "__main__":
     widget = SimpleController()
     widget.setVisible(True)
 
-    reactor.run()         #@UndefinedVariable
-    reactor.getThreadPool().stop()        #@UndefinedVariable
+    upnpy.run()
+    #reactor.run()         #@UndefinedVariable
+    #reactor.getThreadPool().stop()        #@UndefinedVariable
