@@ -1,8 +1,26 @@
 
+# THIS BLOCK NEEDS TO BE EXECUTED BEFORE ANYTHING ELSE
+import sys
+from PyQt4.QtGui import QApplication
+qtApp = QApplication(sys.argv)
+import qt4reactor
+qt4reactor.install(qtApp)
+from twisted.internet import reactor
+######################################################
 
-import platform
+print 'importing upnpy!'
 
-NAME="UPnPy"
-VERSION="0.1"
+__dict__ = ['discovery']
 
-USER_AGENT = "%s/%s UPNP/1.1 %s/%s" % (platform.system(), platform.release(), NAME, VERSION)
+def run():
+    from devman import DeviceManager
+    from ssdp import SSDP
+    
+    global discovery, deviceManager;
+    discovery = SSDP()
+    discovery.listen()
+    
+    deviceManager = DeviceManager()
+    
+    reactor.run()         #@UndefinedVariable
+    reactor.getThreadPool().stop()        #@UndefinedVariable

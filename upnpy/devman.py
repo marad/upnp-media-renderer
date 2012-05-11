@@ -14,9 +14,18 @@ class DeviceManager(object):
         self.soapServer = None # TODO: create SOAPServer implementation
         self._localDevices = {}
         
+        self._remoteDevices = {}
+        self._lostRemoteServices = {}
+        
     
-    def addRemoteDevice(self, device):
+    def foundRemoteDevice(self, headers, device):
         pass
+    
+    def foundRemoteService(self, headers, service):
+        pass
+    
+    #def addRemoteDevice(self, device):
+    #    pass
     
     def addLocalDevice(self, device):
         pass
