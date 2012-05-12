@@ -10,17 +10,17 @@ from twisted.internet import reactor
 
 print 'importing upnpy!'
 
-__dict__ = ['discovery']
-
 def run():
     from devman import DeviceManager
     from ssdp import SSDP
     
-    global discovery, deviceManager;
-    discovery = SSDP()
-    discovery.listen()
+    if 'upnpy.discovery' not in sys.modules:
+        discovery = SSDP()
+        discovery.listen()
+        sys.modules['upnpy.discovery'] = discovery    
     
-    deviceManager = DeviceManager()
+    if 'upnpy.deviceManager' not in sys.modules:
+         sys.modules['upnpy.deviceManager'] = DeviceManager()
     
     reactor.run()         #@UndefinedVariable
     reactor.getThreadPool().stop()        #@UndefinedVariable
