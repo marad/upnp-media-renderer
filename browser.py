@@ -4,20 +4,17 @@ Created on 08-05-2012
 @author: morti
 '''
 
-# THIS BLOCK NEEDS TO BE EXECUTED BEFORE ANYTHING ELSE
-import sys
-from PyQt4.QtGui import QApplication, QWidget, QPushButton, QBoxLayout, QSizePolicy
-app = QApplication(sys.argv)
-import qt4reactor
-qt4reactor.install(app)
-from twisted.internet import reactor
-######################################################
+import upnpy
+from gui.SimpleServerBrowser import SimpleServerBrowser 
 
-from gui.SimpleServerBrowser import SimpleServerBrowser
+def callback(dev, state):
+    print dev.friendlyName, ",", state
 
 if __name__ == '__main__':
     
-    SimpleServerBrowser().setVisible(True)
+    upnpy.remoteDeviceManager.addDeviceCallback(callback)
     
-    reactor.run()  # @UndefinedVariable
-    reactor.getThreadPool().stop()  # @UndefinedVariable
+    browser = SimpleServerBrowser()
+    browser.show()
+    
+    upnpy.run()

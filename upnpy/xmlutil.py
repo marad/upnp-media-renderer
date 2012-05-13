@@ -4,7 +4,7 @@ Created on 23-02-2012
 @author: morti
 '''
 
-import re
+import re, copy
 import time
 import urllib2
 from lxml import etree
@@ -33,6 +33,12 @@ import sys
 ns = {
     'dev':'urn:schemas-upnp-org:device-1-0',
     'srv':'urn:schemas-upnp-org:service-1-0'
+}
+
+didlns = {
+    'base':'urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/',
+    'dc':'http://purl.org/dc/elements/1.1/',
+    'upnp':'urn:schemas-upnp-org:metadata-1-0/upnp/'
 }
 
 def _xpath(node, xpath):
@@ -78,7 +84,7 @@ class SCPDParser(object):
                     argument.direction  = _xpath(argumentNode, 'srv:direction/text()')
                     argument.retval     = _xpath(argumentNode, 'srv:retval/text()')
                     argument.relatedStateVariable = _xpath(argumentNode, 'srv:relatedStateVariable/text()')
-                    argument.stateVariableRef = srv.stateVariables[argument.relatedStateVariable]
+                    argument.relatedStateVariableRef = srv.stateVariables[argument.relatedStateVariable]
                     #action.argumentList[argument.name] = argument
                     action.addArgument(argument)
                 #service.actions[action.name] = action
@@ -94,7 +100,7 @@ class XmlDescriptionBuilder(object):
     usnMatcher = re.compile(r"^(?P<uuid>uuid:[^:]+)(?:::)?(?P<type>.*)$")
     baseURLMatcher = re.compile(r"^(?P<baseURL>[^:]+://[^:]+:[0-9]+).*$")
     
-    maxAgeMatcher = re.compile(r"max-age=(?P<maxAge>[0-9]+)")
+    maxAgeMatcher = re.compile(r"max-age\s*=\s*(?P<maxAge>[0-9]+)")
     
     scpdParser = SCPDParser()
     #usnMatcher = re.compile("")
@@ -121,7 +127,7 @@ class XmlDescriptionBuilder(object):
             elif self.deviceTypeMatcher.match(type):
                 entity = self.buildDevice(doc, headers)
             elif self.serviceTypeMatcher.match(type):
-                entity = self.buildService(doc, headers)
+                entity = self.buildServiceFromHeaders(doc, headers)
                 
             if entity == None:
                 print "Error parsing entity for headers:", headers
@@ -141,6 +147,11 @@ class XmlDescriptionBuilder(object):
         dev = Device()
         self.parseNode(devNode, dev, ['serviceList', 'deviceList', 'iconList'])
         self.parseIcons(devNode, dev)
+        
+        match = self.baseURLMatcher.match(headers['LOCATION'])
+        dev.baseURL = match.group('baseURL')
+        
+        self.parseServiceList(devNode, dev)
         #print "Found device ", dev.friendlyName
         return dev
     
@@ -155,16 +166,17 @@ class XmlDescriptionBuilder(object):
         dev = Device()
         self.parseNode(devNode, dev, ['serviceList', 'deviceList', 'iconList'])
         self.parseIcons(devNode, dev)
-        
         try:        
             dev.parentUDN = devNode.xpath("../../dev:UDN/text()", namespaces=ns)[0]
             dev.embedded = True
         except:
             pass
         
+        self.parseServiceList(devNode, dev)
+        
         return dev
     
-    def buildService(self, doc, headers):
+    def buildServiceFromHeaders(self, doc, headers):
         match = self.usnMatcher.match(headers['USN'])
         devUUID = match.group('uuid')
         serviceType = match.group('type')        
@@ -186,12 +198,30 @@ class XmlDescriptionBuilder(object):
         #print 'Found service', srv.friendlyName
         return srv
     
+    def buildService(self, srvNode, device):
+        srv = Service()
+        self.parseNode(srvNode, srv)
+        
+        srv.parentUDN = device.UDN
+        srv.baseURL = device.baseURL        
+        
+        self.scpdParser.parse(srv)
+        
+        device.addService(srv)        
+        return srv        
+    
     def parseIcons(self, devNode, device):
         iconNodeList = devNode.xpath("dev:iconList/dev:icon", namespaces=ns)
         for iconNode in iconNodeList:
             icon = Icon()
             self.parseNode(iconNode, icon)
             device.addIcon(icon)
+            
+    def parseServiceList(self, devNode, device):
+        serviceNodeList = devNode.xpath("dev:serviceList/dev:service", namespaces=ns)
+        for srvNode in serviceNodeList:
+            print srvNode
+            self.buildService(srvNode, device) 
             
                 
     def parseNode(self, doc, obj, exceptFor=[]):
@@ -213,6 +243,80 @@ class XmlDescriptionBuilder(object):
             
             if tagName == None or tagName in exceptFor:
                 continue
+            
+            if len(children) == 0:
+                setattr(obj, tagName, node.text) 
+            else:
+                nobj = Entity()
+                setattr(obj, tagName, nobj)
+                toParse.extend(zip(
+                    [nobj for i in xrange( len(children) )],
+                    children
+                    ))     
+
+class DIDLParser(object):
+    
+    TYPE_CONTAINER  = 'CONTAINER'
+    TYPE_ITEM       = 'ITEM'
+    
+    def parse(self, xml):
+        #print xml
+        doc = etree.fromstring(xml)
+        containers = doc.xpath("/base:DIDL-Lite/base:container", namespaces=didlns)
+        
+        result = []
+        for container in containers:
+            obj = Entity()
+            obj.type = DIDLParser.TYPE_CONTAINER
+            self.parseNode(container, obj)
+            result.append(obj)
+            
+        items = doc.xpath("/base:DIDL-Lite/base:item", namespaces=didlns)
+        for item in items:
+            obj = Entity()
+            obj.type = DIDLParser.TYPE_ITEM
+            self.parseNode(item, obj)
+            result.append(obj)
+        
+        return result
+        
+    def parseNode(self, doc, obj, exceptFor=[]):
+        """
+        Parses an XML node (doc) info Python object OBJ 
+        """
+        
+        print 'parsing node...'
+        obj.attr = {}
+        attrs = obj.attr
+        for k,v in doc.attrib.iteritems():
+            attrs[k] = v
+        
+        
+        children = doc.getchildren()
+        toParse = zip(
+            [obj for i in xrange(len(children))],
+            children
+            )
+        while len(toParse):
+            obj, node = toParse.pop()
+            
+            children = node.getchildren()
+            
+            result = XmlDescriptionBuilder.tagNameMatcher.match(node.tag)
+            tagName = result.group(2)
+                   
+            if tagName == None or tagName in exceptFor:
+                continue
+            
+            if tagName == 'class': tagName = 'clazz'
+            
+            if not hasattr(obj, 'attr'):
+                obj.attr = {}
+            attrs = obj.attr
+            
+            for k,v in node.attrib.iteritems():
+                print k, v
+                attrs[k] = v
             
             if len(children) == 0:
                 setattr(obj, tagName, node.text) 

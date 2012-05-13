@@ -8,19 +8,19 @@ qt4reactor.install(qtApp)
 from twisted.internet import reactor
 ######################################################
 
-print 'importing upnpy!'
+module = sys.modules[__name__]
+
+from devman import RemoteDeviceManager
+from ssdp import SSDP
+
+module.qtApp = qtApp
+
+module.ssdp = SSDP()
+module.remoteDeviceManager = RemoteDeviceManager()    
 
 def run():
-    from devman import DeviceManager
-    from ssdp import SSDP
-    
-    if 'upnpy.discovery' not in sys.modules:
-        discovery = SSDP()
-        discovery.listen()
-        sys.modules['upnpy.discovery'] = discovery    
-    
-    if 'upnpy.deviceManager' not in sys.modules:
-         sys.modules['upnpy.deviceManager'] = DeviceManager()
+    module.ssdp.listen()
+    module.ssdp.search()
     
     reactor.run()         #@UndefinedVariable
     reactor.getThreadPool().stop()        #@UndefinedVariable

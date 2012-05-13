@@ -70,6 +70,7 @@ class SSDP(object):
         self._localDevices = {}
         self.deviceFoundHandlers = []
         self.serviceFoundHandlers = []
+        self.deviceExpiredHandlers = []
         self.xmlParser = XmlDescriptionBuilder()
         
     def listen(self):
@@ -81,6 +82,7 @@ class SSDP(object):
 
             
         self.descServer = reactor.listenTCP(0, Site(DescriptionServerPage(self))) #@UndefinedVariable
+        self._removeOldDevices()
         #print 'Started description server on %s:%s' % (self.descServer.getHost().host, self.descServer.getHost().port)
         
     def startProtocol(self):
@@ -121,6 +123,7 @@ class SSDP(object):
                 
             # Check if we've found new device
             if 'LOCATION' in data.keys() and UDN not in self._cache.keys():
+                print data
                 def inner_parseDeviceInfo():
                     location = data['LOCATION']                    
                     try: # Try to parse the device XML           
@@ -200,7 +203,7 @@ class SSDP(object):
             if 'CACHE-CONTROL' in data.keys() and UDN in self._cache.keys():
                 maxAge = RegexUtil.getMaxAge(data['CACHE-CONTROL']);
                 self._cache[UDN].maxAge = time.time() + maxAge
-                print self._cache[UDN].maxAge
+                #print self._cache[UDN].maxAge
                 
                                                
         except Exception as e:
@@ -269,21 +272,35 @@ class SSDP(object):
         try: self.serviceFoundHandlers.remove(handler)
         except: pass
         
+    def addDeviceExpiredHandler(self, handler):
+        self.deviceExpiredHandlers.append(handler)
+    
+    def removeDeviceExpiredHandler(self, handler):
+        try: self.deviceExpiredHandlers.remove(handler)
+        except: pass
+        
     def _removeOldDevices(self):
-        # TODO: remove old devices
-        
-        # Call this again in 10.5 seconds
-        
         toRemove = []
         t = time.time()
         for udn, dev in self._cache.iteritems():
-            if t > dev.maxAge:
-                toRemove.append(udn)
+            try:
+                if t > dev.maxAge:
+                    toRemove.append(udn)
+            except:
+                traceback.print_exc()
         
-        for udn in toRemove:
-            # TODO: inform about removing device
-            print '===== REMOVING DEVICE', self._cache[udn].friendlyName, '! ====='
-            del self._cache[udn]
+        def removeDevice(device):
+            for subDev in device.devices:
+                removeDevice(subDev)
+                
+            for handler in self.deviceExpiredHandlers:
+                handler(device)            
+            del self._cache[device.UDN]
+            
+        for udn in toRemove:            
+            #print '===== REMOVING DEVICE', self._cache[udn].friendlyName, '! ====='
+            removeDevice(self._cache[udn])
+            #del self._cache[udn]
             
         reactor.callLater(10.5, self._removeOldDevices) #@UndefinedVariable
         

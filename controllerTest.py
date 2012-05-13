@@ -16,6 +16,7 @@ Created on 24-02-2012
 ######################################################
 
 import upnpy
+#upnpy.init()
 
 from gui.SimpleController import SimpleController
 
@@ -25,5 +26,4 @@ if __name__ == "__main__":
     widget.setVisible(True)
 
     upnpy.run()
-    #reactor.run()         #@UndefinedVariable
-    #reactor.getThreadPool().stop()        #@UndefinedVariable
+

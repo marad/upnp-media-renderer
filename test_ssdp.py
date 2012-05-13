@@ -2,13 +2,14 @@
 
 
 # THIS BLOCK NEEDS TO BE EXECUTED BEFORE ANYTHING ELSE
-import sys
-from PyQt4.QtGui import QApplication, QWidget, QPushButton, QBoxLayout, QSizePolicy
-app = QApplication(sys.argv)
-import qt4reactor
-qt4reactor.install(app)
-from twisted.internet import reactor
+#import sys
+#app = QApplication(sys.argv)
+#import qt4reactor
+#qt4reactor.install(app)
+#from twisted.internet import reactor
 ######################################################
+import upnpy
+from PyQt4.QtGui import QApplication, QWidget, QPushButton, QBoxLayout, QSizePolicy
 
 from upnpy.ssdp import SSDP
 from upnpy.soap import SOAPClient
@@ -126,7 +127,7 @@ def advertise():
     s.controlURL = '/control/service'
     s.eventSubURL = '/event/sub'
     d.addService(s)
-    ssdp.alive(d, maxAge=1800)
+    ssdp.alive(d, maxAge=10)
 
 if __name__ == "__main__":
     print "Testing SSDP..."
@@ -151,7 +152,7 @@ if __name__ == "__main__":
 
     closeButton = QPushButton("Zamknij")
     closeButton.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-    QWidget.connect(closeButton, SIGNAL("clicked()"), app.quit)
+    QWidget.connect(closeButton, SIGNAL("clicked()"), upnpy.qtApp.quit)
 
     searchButton = QPushButton("Search")
     QWidget.connect(searchButton, SIGNAL("clicked()"), search)
@@ -169,6 +170,5 @@ if __name__ == "__main__":
     layout.addWidget(closeButton)
     widget.setLayout(layout)
 
-    reactor.run()  # @UndefinedVariable
-    reactor.getThreadPool().stop()  # @UndefinedVariable
+    upnpy.run()
     print "Zamykam aplikacje"

@@ -6,11 +6,14 @@ Created on 24-02-2012
 '''
 
 #from upnpy.ssdp import SSDP
+import upnpy
 from upnpy.soap import SOAPClient
 
 from PyQt4.QtGui import QWidget, QBoxLayout, QTreeWidget, QTreeWidgetItem, QLabel, QTextEdit
-from PyQt4.QtGui import QPushButton, QGroupBox, QLineEdit, QMessageBox
+from PyQt4.QtGui import QPushButton, QGroupBox, QLineEdit, QMessageBox, QComboBox
 from PyQt4.QtCore import SIGNAL
+
+import copy, sys
 
 class ActionWindow(QWidget):
     def __init__(self, service, action):
@@ -32,11 +35,35 @@ class ActionWindow(QWidget):
         vlay = QBoxLayout(QBoxLayout.TopToBottom)
 
         for arg in self.action.argumentList.values():
-            if arg.direction == arg.DIR_OUT: continue
-            #print 'Argument: ', arg.name
 
-            edit = QLineEdit()
-            QWidget.connect(edit, SIGNAL('textChanged(QString)'), lambda x: self.textChanged(arg.name, edit))
+            if arg.direction == arg.DIR_OUT: continue
+            self.args[copy.copy(arg.name)] = ''
+            #print 'Argument: ', arg.name
+            var = arg.relatedStateVariableRef            
+            if hasattr(var, 'allowedValueList') and len(var.allowedValueList):
+                edit = QComboBox()
+                edit.argName = copy.copy(str(arg.name))
+                
+                def updateName(index):
+                    print str(self.sender().itemText(index))
+                    self.args[self.sender().argName] = str(self.sender().itemText(index))
+                    
+                QWidget.connect(edit, SIGNAL('currentIndexChanged(int)'), updateName)
+                                
+                for value in var.allowedValueList:
+                    edit.addItem(value)
+                                    
+            else:
+                edit = QLineEdit()
+                edit.argName = copy.copy(str(arg.name))            
+                
+                def updateName(text):
+                    self.args[self.sender().argName] = str(text)
+                    
+                QWidget.connect(edit, SIGNAL('textChanged(QString)'), updateName)
+                if var.defaultValue:
+                    edit.setText(str(var.defaultValue))
+                        
 
             hlay = QBoxLayout(QBoxLayout.LeftToRight)
             hlay.addWidget(QLabel(arg.name))
@@ -73,10 +100,12 @@ class ActionWindow(QWidget):
         self.setLayout(layout)
         self.adjustSize()
 
-    def textChanged(self, argName, edit):
-        self.args[argName] = edit.text()
+    def textChanged(self, argName, text):
+        print argName, '=', text
+        self.args[argName] = str(text)
 
     def sendSoap(self):
+        print 'ARGS:',self.args
         out = self.soap.invokeAction(self.service, self.action, self.args)
 
         if out == None:
@@ -96,10 +125,11 @@ class SimpleController(QWidget):
         #self.ssdp.listen()
         #self.ssdp.search(target='upnp:rootdevice', mx=1)
         #self.ssdp.search()
-        from upnpy import discovery
-        discovery.addDeviceHandler(self.deviceFound)
-        discovery.addServiceHandler(lambda x, y: self.addService(y))
-        discovery.search()
+        
+        self.ssdp = upnpy.ssdp
+        self.ssdp.addDeviceHandler(self.deviceFound)
+        self.ssdp.addServiceHandler(lambda x, y: self.addService(y))
+        self.ssdp.search()
         self.act = None
         
         self.devMap = {}

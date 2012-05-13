@@ -15,6 +15,23 @@ class NoSuchActionError(ValueError):
 class EmptyResponseException(Exception):
     pass
 
+
+htmlCodes = (
+    ('&', '&amp;'),
+    ('<', '&lt;'),
+    ('>', '&gt;'),
+    ('"', '&quot;'),
+    ("'", '&#39;'),
+)
+
+def encode(string):
+    """Returns the given HTML with ampersands, quotes and carets encoded."""
+    return string.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#39;')
+
+def decode(string):
+    """Returns the given HTML with ampersands, quotes and carets encoded."""
+    return string.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;','>').replace('&quot;', '"').replace('&#39;', "'")
+
 class SOAPResponseParser(object):
     
     def __init__(self, action):
@@ -22,7 +39,7 @@ class SOAPResponseParser(object):
         
     def parse(self, xml):
         
-        #print "XML:",xml
+        #print "\n\nReceived XML:",xml
         
         ret = {}
         for arg  in self.action.argumentList.values():
@@ -31,7 +48,7 @@ class SOAPResponseParser(object):
             match = re.search('<%(tag)s>([^<]*)</%(tag)s>' % {'tag': arg.name}, xml)
             if not match:
                 raise EmptyResponseException()
-            ret[arg.name] = match.group(1)
+            ret[arg.name] = decode(match.group(1))
             
         return ret
     
@@ -74,8 +91,8 @@ class SOAPClient(object):
         
         args = ''
         if inArgs != None:
-            for k, v in zip(inArgs.keys(), inArgs.values()):
-                args += self.ARG_TPL % {'name':k, 'value':v}
+            for k, v in inArgs.iteritems(): #zip(inArgs.keys(), inArgs.values()):
+                args += self.ARG_TPL % {'name':k, 'value':encode(v)}
         
         actionId = service.serviceType +'#'+action.name
                 
@@ -93,8 +110,8 @@ class SOAPClient(object):
     def _genResponse(self, service, action, outArgs=None):
         args = ''
         if outArgs != None:
-            for k, v in zip(outArgs.keys(), outArgs.values()):
-                args += self.ARG_TPL % {'name':k, 'value':v}
+            for k, v in outArgs.iteritems(): #zip(outArgs.keys(), outArgs.values()):
+                args += self.ARG_TPL % {'name':k, 'value':encode(v)}
         
         actionId = service.serviceId +'#'+action.name
         
@@ -112,7 +129,7 @@ class SOAPClient(object):
     def invokeAction(self, service, action, args):        
         req = self._genRequest(service, action, args)
         
-        #print 'Sending SOAP:', req
+        #print '\n\nSending SOAP:', req
         #print service.host, service.port
         
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

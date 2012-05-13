@@ -81,15 +81,28 @@ class Device(object):
         #self.location = deviceDesc.location
     
     def addDevice(self, device):
-        device.parent = self
-        self.devices[device.UDN] = device
+        if device.UDN not in self.devices.keys():
+            device.parent = self
+            self.devices[device.UDN] = device
         
     def addService(self, service):
-        service.parent = self
-        self.services[service.serviceId] = service
+        if service.serviceId not in self.services.keys():
+            service.parent = self
+            self.services[service.serviceId] = service
 
     def addIcon(self, icon):
         self.icons.append(icon)
+        
+    def getService(self, sid):
+        return self.services[sid]
+    
+    def findService(self, sid):
+        pattern = re.compile(sid)
+        #print self.services
+        for srv in self.services.values():
+            #print srv.serviceId
+            if pattern.search(srv.serviceId):
+                return srv
         
     def genDeviceDesc(self):
         node = etree.Element('device')

@@ -30,4 +30,4 @@ class RegexUtil(object):
     
     @staticmethod
     def getMaxAge(string):
-        return int(RegexUtil.maxAgeMatcher.match(string).group('maxAge'))
+        return int(RegexUtil.maxAgeMatcher.search(string).group('maxAge'))
