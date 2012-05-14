@@ -92,7 +92,7 @@ class SOAPClient(object):
         args = ''
         if inArgs != None:
             for k, v in inArgs.iteritems(): #zip(inArgs.keys(), inArgs.values()):
-                args += self.ARG_TPL % {'name':k, 'value':encode(v)}
+                args += self.ARG_TPL % {'name':str(k), 'value':encode(str(v))}
         
         actionId = service.serviceType +'#'+action.name
                 
@@ -111,7 +111,7 @@ class SOAPClient(object):
         args = ''
         if outArgs != None:
             for k, v in outArgs.iteritems(): #zip(outArgs.keys(), outArgs.values()):
-                args += self.ARG_TPL % {'name':k, 'value':encode(v)}
+                args += self.ARG_TPL % {'name':str(k), 'value':encode(str(v))}
         
         actionId = service.serviceId +'#'+action.name
         

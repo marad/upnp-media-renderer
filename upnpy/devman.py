@@ -4,8 +4,43 @@ Created on 25-02-2012
 @author: morti
 '''
 
-import upnpy, sys, re, copy
+import upnpy, re, copy
+from twisted.internet import reactor
 
+class LocalDeviceManager(object):
+    def __init__(self):
+        self.ssdp = upnpy.discovery
+        
+        self._devices = {}
+        #reactor.callLater(13, self._sendAlive) #@UndefinedVariable        
+    
+    def _sendAliveForDevice(self, device):
+        self.ssdp.alive(device, maxAge=15)
+    
+    def _sendAlive(self):
+        # TODO: send alive message
+        #print 'Sending alive'
+        for device in self._devices.values():
+            self._sendAliveForDevice(device)            
+        
+        reactor.callLater(10, self._sendAlive) #@UndefinedVariable
+    
+    def getDevice(self, uuid):
+        return self._devices[uuid]
+    
+    def addDevice(self, device):
+        if device.UDN not in self._devices.keys():
+            try:
+                self._devices[device.UDN] = device
+                self._sendAliveForDevice(device)
+            except: pass
+    
+    def removeDevice(self, device):
+        self.ssdp.byeBye(device)
+        del self._devices[device.UDN]
+    
+    def searchResponse(self, headers):
+        self._sendAlive()
 
 class RemoteDeviceManager(object):
     
@@ -14,7 +49,7 @@ class RemoteDeviceManager(object):
     REMOVED     = "REMOVED"
     
     def __init__(self):
-        self.ssdp = upnpy.ssdp 
+        self.ssdp = upnpy.discovery 
         
         self.ssdp.addDeviceHandler(self.foundRemoteDevice)
         self.ssdp.addServiceHandler(self.foundRemoteService)
@@ -60,7 +95,7 @@ class RemoteDeviceManager(object):
             
 
     def foundRemoteService(self, headers, service):
-        print 'Remote service!', service
+        #print 'Remote service!', service
         try:
             # Add service to device
             self._remoteDevices[service.parentUDN].addService(service)
@@ -72,7 +107,7 @@ class RemoteDeviceManager(object):
             self._lostRemoteServices[service.parentUDN].append(service)
             
     def remoteDeviceExpired(self, device):
-        print 'Remove device:', device.friendlyName
+        #print 'Remove device:', device.friendlyName
         self._notify(device, False, True)
             
     # Registers callback when device need attention (new or updated).

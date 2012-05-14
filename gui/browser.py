@@ -18,17 +18,15 @@ class ServerListModel(QAbstractListModel):
     def __init__(self):
         QAbstractListModel.__init__(self)
         self.data = []
+        upnpy.remoteDeviceManager.addDeviceCallback(self._deviceStatus, ".*MediaServer.*")
     
     def data(self, index, role):        
         if index.row() == 0:
             return 'Wybierz serwer...'
         else:
-            return self.data[index.row()-1].friendlyName
-        #if index.row() < len(self.data):
-        #    return self.data[index.row()]
-        #else:
-        #    return None
-    
+            dev = self.data[index.row()-1]
+            return "%s (%s)" % (dev.friendlyName, dev.serverInfo.address) 
+
     def headerData(self, section, orientation, role):
         pass
     
@@ -47,6 +45,15 @@ class ServerListModel(QAbstractListModel):
         self.emit(SIGNAL("dataChanged(QModelIndex,QModelIndex)"), 
             self.index(idx, 0), 
             self.index(idx, 0))
+    
+    def _deviceStatus(self, device, status):        
+        if status == "NEW":
+            self.addItem(device)
+        elif status == "REMOVED":
+            self.removeItem(device)
+    
+    def getItem(self, index):
+        return self.data[index-1]
 
 class SimpleServerBrowser(QWidget):
     '''
@@ -63,12 +70,11 @@ class SimpleServerBrowser(QWidget):
         
         self.soap = SOAPClient();
         filter = 'MediaServer'
-        upnpy.remoteDeviceManager.addDeviceCallback(self.deviceStatus)
         
     def setupUI(self):
         
-        self.video = VideoPlayer()
-        self.video.show()
+        #self.video = VideoPlayer()
+        #self.video.show()
         
         vlay = QVBoxLayout()
         
@@ -87,13 +93,9 @@ class SimpleServerBrowser(QWidget):
         QWidget.connect(combo, SIGNAL('currentIndexChanged(int)'), self.serverChanged)
         QWidget.connect( self.tree, SIGNAL("itemDoubleClicked(QTreeWidgetItem*,int)"), self.itemDblClicked)
     
-    def deviceStatus(self, device, status):        
-        #self.serversCombo.addItem(device.friendlyName)
-        if status == "NEW":
-            self.servers.addItem(device)
-            
     def _queryServer(self, objectId):
-        device = self.servers.data[self.serversCombo.currentIndex()-1]
+        #device = self.servers.data[self.serversCombo.currentIndex()-1]
+        device = self.servers.getItem(self.serversCombo.currentIndex())
         service = device.findService("ContentDirectory")
         resp = self.soap.invokeActionByName(service, 'Browse', 
             {
@@ -110,32 +112,25 @@ class SimpleServerBrowser(QWidget):
             
     def serverChanged(self, index):
         r = self._queryServer(0)
+        self.tree.clear()
         for item in r:
-            treeItem = QTreeWidgetItem(None, [item.title + '(' +item.attr['id']+ ')'])
+            treeItem = QTreeWidgetItem(None, [item.title])
             treeItem.object = item            
             self.tree.addTopLevelItem(treeItem)            
         
     def itemDblClicked(self, treeItem, column):
         item = treeItem.object
         
-        print item.attr
-        print dir(item)
-        if item.type == DIDLParser.TYPE_CONTAINER:
+        #print item.attr
+        #print dir(item)
+        if item.type == DIDLParser.TYPE_CONTAINER and treeItem.childCount() == 0:
             iid = item.attr['id']            
-            print iid
             r = self._queryServer(iid)
             for ch in r:
-                newItem = QTreeWidgetItem(treeItem, [ch.title + '(' + ch.attr['id'] + ')'])
+                newItem = QTreeWidgetItem(treeItem, [ch.title + ', ' +ch.attr['id']])
                 newItem.object = ch
         elif item.type == DIDLParser.TYPE_ITEM:
-            print 'play:', item.res
-            #self.video = VideoPlayer()
-            #self.video.show()
-            
-            self.video.stop()
-            self.video.showURL(item.res)
-            
-            #self.wideo = 
+            self.emit(SIGNAL("play"), item.res)
         
         
     

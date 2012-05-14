@@ -4,10 +4,11 @@ Created on 23-02-2012
 @author: morti
 '''
 
-import re, copy
+import re, upnpy
 import time
 import urllib2
 from lxml import etree
+from lxml.etree import XMLSyntaxError
 from upnpy.device import Device, Service, Icon, StateVariable, Action, ActionArgument
 
 def genRootDesc(device):
@@ -18,10 +19,14 @@ def genRootDesc(device):
     minor = etree.Element('minor')
     minor.text = '0'
     
+    urlBase = etree.Element('URLBase')
+    urlBase.text = upnpy.descServer.getBaseURL()
+    
     specVersion.append(major)
     specVersion.append(minor)
     root.append(specVersion)
     root.append(device.genDeviceDesc())
+    root.append(urlBase)
     return root
 
 class Entity(object):
@@ -49,10 +54,11 @@ def _xpath(node, xpath):
         return None
 
 class SCPDParser(object):
-    def parse(self, srv):
-        resp = urllib2.urlopen(srv.fullSCPDURL)
-        xml = resp.read()
-        
+    def parse(self, srv, xml=None):
+        if not xml:
+            resp = urllib2.urlopen(srv.fullSCPDURL)
+            xml = resp.read()
+            
         try:
             doc = etree.fromstring(xml)
             
@@ -89,6 +95,8 @@ class SCPDParser(object):
                     action.addArgument(argument)
                 #service.actions[action.name] = action
                 srv.addAction(action)
+        except XMLSyntaxError:
+            pass
         except:
             traceback.print_exc(file=sys.stderr)
 
@@ -114,7 +122,11 @@ class XmlDescriptionBuilder(object):
         
         headers['DEVTYPE'] = type
         
-        resp = urllib2.urlopen(headers['LOCATION'])
+        try:
+            resp = urllib2.urlopen(headers['LOCATION'])
+        except urllib2.URLError:
+            print "Error opening:", headers['LOCATION']
+            return None
         xml = resp.read()        
         
         try:
@@ -139,6 +151,9 @@ class XmlDescriptionBuilder(object):
                     entity.maxAge = time.time() + int(match.group('maxAge'))
              
             return entity
+        except etree.XMLSyntaxError:
+            print "Invalid server response:", xml
+            return None
         except:
             traceback.print_exc(file=sys.stderr)
             return None
@@ -164,8 +179,13 @@ class XmlDescriptionBuilder(object):
             return None
         devNode = UDNs[0].getparent()
         dev = Device()
+    
         self.parseNode(devNode, dev, ['serviceList', 'deviceList', 'iconList'])
         self.parseIcons(devNode, dev)
+        
+        match = self.baseURLMatcher.match(headers['LOCATION'])
+        dev.baseURL = match.group('baseURL')
+        
         try:        
             dev.parentUDN = devNode.xpath("../../dev:UDN/text()", namespaces=ns)[0]
             dev.embedded = True
@@ -205,6 +225,7 @@ class XmlDescriptionBuilder(object):
         srv.parentUDN = device.UDN
         srv.baseURL = device.baseURL        
         
+        #print "== SCPD", srv.fullSCPDURL
         self.scpdParser.parse(srv)
         
         device.addService(srv)        
@@ -220,7 +241,6 @@ class XmlDescriptionBuilder(object):
     def parseServiceList(self, devNode, device):
         serviceNodeList = devNode.xpath("dev:serviceList/dev:service", namespaces=ns)
         for srvNode in serviceNodeList:
-            print srvNode
             self.buildService(srvNode, device) 
             
                 
@@ -284,8 +304,6 @@ class DIDLParser(object):
         """
         Parses an XML node (doc) info Python object OBJ 
         """
-        
-        print 'parsing node...'
         obj.attr = {}
         attrs = obj.attr
         for k,v in doc.attrib.iteritems():
@@ -315,7 +333,7 @@ class DIDLParser(object):
             attrs = obj.attr
             
             for k,v in node.attrib.iteritems():
-                print k, v
+                #print k, v
                 attrs[k] = v
             
             if len(children) == 0:

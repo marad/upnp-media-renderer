@@ -10,6 +10,7 @@ from upnpy.util import Entity
 
 def _createNodesFromAttrs(obj, attrList, parent):
     #nodes = []
+    if obj == None: return
     for name in attrList:
         if hasattr(obj, name):
             value = getattr(obj, name)
@@ -76,6 +77,7 @@ class Device(object):
         self.UPC = None
         self.presentationURL = None
         self.baseURL = None
+        self.URLBase = None
         self.rootDescURL = None
         self.embedded = False
         #self.location = deviceDesc.location
@@ -87,7 +89,8 @@ class Device(object):
         
     def addService(self, service):
         if service.serviceId not in self.services.keys():
-            service.parent = self
+            #service.parent = self
+            service.device = self
             self.services[service.serviceId] = service
 
     def addIcon(self, icon):
@@ -113,7 +116,7 @@ class Device(object):
         _createNodesFromAttrs(self, ['deviceType', 'friendlyName', 'manufacturer',
                                      'manufacturerURL', 'modelDescription', 'modelNumber',
                                      'modelName', 'modelURL', 'serialNumber', 'UDN', 'UPC',
-                                     'presentationURL'],
+                                     'presentationURL', 'URLBase'],
                               node)
         
         if len(self.icons) > 0:
@@ -228,7 +231,7 @@ class Service(object):
     
     @property
     def fullSCPDURL(self):
-         return self.baseURL.rstrip('/') + '/' + self.SCPDURL.lstrip('/')
+        return self.baseURL.rstrip('/') + '/' + self.SCPDURL.lstrip('/')
      
     @property
     def host(self):

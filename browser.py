@@ -5,16 +5,18 @@ Created on 08-05-2012
 '''
 
 import upnpy
-from gui.SimpleServerBrowser import SimpleServerBrowser 
+#from gui.browser import SimpleServerBrowser
+from gui.player import Player 
 
-def callback(dev, state):
-    print dev.friendlyName, ",", state
+#def callback(dev, state):
+#    print dev.friendlyName, ",", state
 
 if __name__ == '__main__':
     
-    upnpy.remoteDeviceManager.addDeviceCallback(callback)
+    #upnpy.remoteDeviceManager.addDeviceCallback(callback)
     
-    browser = SimpleServerBrowser()
-    browser.show()
+    #window = SimpleServerBrowser()
+    window = Player()
+    window.show()
     
     upnpy.run()

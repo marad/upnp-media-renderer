@@ -5,7 +5,6 @@
 
 from twisted.internet import reactor
 from twisted.internet.protocol import DatagramProtocol
-from twisted.web.server import Site
 from twisted.web.resource import Resource
 from twisted.internet import threads
 
@@ -18,7 +17,7 @@ import uuid
 import socket
 import traceback
 import sys, time
-from util import RegexUtil
+from util import RegexUtil, Entity, localInterface
 
 #from device import parseRootDeviceDesc
 
@@ -81,7 +80,8 @@ class SSDP(object):
         self.multicast.joinGroup(self.SSDP_ADDR)
 
             
-        self.descServer = reactor.listenTCP(0, Site(DescriptionServerPage(self))) #@UndefinedVariable
+        #self.descServer = reactor.listenTCP(0, Site(DescriptionServerPage(self))) #@UndefinedVariable
+        self.descServer = upnpy.descServer
         self._removeOldDevices()
         #print 'Started description server on %s:%s' % (self.descServer.getHost().host, self.descServer.getHost().port)
         
@@ -115,7 +115,9 @@ class SSDP(object):
                     name, value = field.split(':', 1)
                     name, value = [name.upper(), value.strip()]
                     data[name] = value
-                
+            
+            if data['TYPE'] == SSDP.TYPE_SEARCH:
+                upnpy.localDeviceManager.searchResponse(data)
             
             UDN = None    
             if 'USN' in data.keys():
@@ -123,7 +125,6 @@ class SSDP(object):
                 
             # Check if we've found new device
             if 'LOCATION' in data.keys() and UDN not in self._cache.keys():
-                print data
                 def inner_parseDeviceInfo():
                     location = data['LOCATION']                    
                     try: # Try to parse the device XML           
@@ -137,6 +138,14 @@ class SSDP(object):
                 def inner_resultCallBack(entity):
                     if entity != None:
                         if isinstance(entity, Device) and entity.UDN not in self._cache.keys():
+                            
+                            # save server info
+                            info = RegexUtil.getServerAndPortFromURL(data['LOCATION'])
+                            serverInfo = Entity()
+                            serverInfo.address = info[0]
+                            serverInfo.port = info[1]
+                            entity.serverInfo = serverInfo
+                            
                             # save device in cache
                             self._cache[entity.UDN] = entity
                             
@@ -187,10 +196,10 @@ class SSDP(object):
                                 handler(data, entity)
                 
                 
-                UDN = None
-                if 'USN' in data.keys():                    
-                    match = re.search('(uuid:[^:]*)', data['USN'])
-                    UDN = match.group(1)
+                #UDN = None
+                #if 'USN' in data.keys():                    
+                #    match = re.search('(uuid:[^:]*)', data['USN'])
+                #    UDN = match.group(1)
 #                print 'LOCATION:', data['LOCATION']
 #                if data['LOCATION'] not in self._cache.keys():
                 #if UDN not in self._cache.keys():
@@ -200,14 +209,14 @@ class SSDP(object):
             
             
             # Refresh age information
-            if 'CACHE-CONTROL' in data.keys() and UDN in self._cache.keys():
+            if 'CACHE-CONTROL' in data.keys() and UDN in self._cache.keys() and data['CACHE-CONTROL']:
                 maxAge = RegexUtil.getMaxAge(data['CACHE-CONTROL']);
                 self._cache[UDN].maxAge = time.time() + maxAge
                 #print self._cache[UDN].maxAge
                 
                                                
-        except Exception as e:
-            print repr(e)
+        except:
+            traceback.print_exc()
             
         
     def search(self, target='ssdp:all', mx=3, addr=None):
@@ -227,14 +236,14 @@ class SSDP(object):
         
         # TODO: poprawic aby uruchamial sie watek i rozkladal 
         # komunikaty rownomiernie w czasie
-        print self.descServer.getHost().host
+        #print self.descServer.getHost().host
+        #print device
+        
         path = '/device/%s.xml' % device.UDN
-        baseURL = "http://%s:%s" % ('localhost', self.descServer.getHost().port)
-        rootDescURL = "%s%s" % (baseURL, path)        
+        baseURL = upnpy.descServer.getBaseURL()
+        rootDescURL = "%s%s" % (upnpy.descServer.getBaseURL(), path)        
         device.rootDescURL = rootDescURL
         device.baseURL = baseURL
-        
-        self._localDevices[device.UDN] = device
         
         TPL = self.NOTIFY_TPL % (maxAge, rootDescURL, "%s", USER_AGENT, "%s")
         addr = (self.SSDP_ADDR, self.SSDP_PORT)
@@ -247,7 +256,9 @@ class SSDP(object):
         #    self.unicast.write(TPL % (service.serviceType, device.UDN+"::"+service.serviceType), addr)
             
         for service in device.services.values():
-            service.SCPDURL = '/service/%s.xml' % (service.serviceId)
+            service.SCPDURL = upnpy.descServer.getSCPDURL(service)
+            service.controlURL = upnpy.descServer.getControlURL(service)
+            service.eventSubURL = upnpy.descServer.getEventSubURL(service)            
             self.unicast.write(TPL % (service.serviceType, device.UDN+"::"+service.serviceType), addr)
         
         #data = self.NOTIFY_TPL % (maxAge, rootDescURL, device.deviceType, USER_AGENT, 
@@ -257,6 +268,10 @@ class SSDP(object):
 #        data = self.NOTIFY_TPL % (maxAge, rootDescURL, "upnp:rootdevice", USER_AGENT, 
 #                                 device.UDN+"::"+device.deviceType)
 #        self.unicast.write(data, (self.SSDP_ADDR, self.SSDP_PORT))
+
+    def byeBye(self, device):
+        # TODO: send bye bye message
+        pass
     
     def addDeviceHandler(self, handler):
         self.deviceFoundHandlers.append(handler)
@@ -326,11 +341,13 @@ class SSDP(object):
 
 from lxml import etree
 from xmlutil import genRootDesc
+import upnpy
 
 class DescriptionServerPage(Resource):
     isLeaf = True
-    def __init__(self, ssdp):
-        self.ssdp = ssdp
+    def __init__(self):
+        self.ssdp = upnpy.discovery
+        self.localDevices = upnpy.localDeviceManager
         
     def render_GET(self, request):
         print 'Desc server got request:', request.path
@@ -345,8 +362,8 @@ class DescriptionServerPage(Resource):
         
         if resType == 'device':
             request.responseHeaders.setRawHeaders('content-type', ['text/xml'])            
-
-            device = self.ssdp._localDevices[resId]
+            device = self.localDevices.getDevice(resId)
+            print etree.tostring(genRootDesc(device))
             return etree.tostring(genRootDesc(device))
     
         if resType == 'service':
@@ -358,3 +375,15 @@ class DescriptionServerPage(Resource):
                     return etree.tostring(service.genSCPD())
                     
         return "NUTHING"
+    
+    def getSCPDURL(self, service):
+        if service.device:
+            return  "/%s::%s" % (service.device.UDN, service.serviceId)
+        else:
+            return None
+    
+    def getControlUrl(self, service):
+        if service.device:
+            return             
+        else:
+            return None

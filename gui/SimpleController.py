@@ -126,7 +126,7 @@ class SimpleController(QWidget):
         #self.ssdp.search(target='upnp:rootdevice', mx=1)
         #self.ssdp.search()
         
-        self.ssdp = upnpy.ssdp
+        self.ssdp = upnpy.discovery
         self.ssdp.addDeviceHandler(self.deviceFound)
         self.ssdp.addServiceHandler(lambda x, y: self.addService(y))
         self.ssdp.search()

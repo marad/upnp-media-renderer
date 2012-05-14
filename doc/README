@@ -2,10 +2,10 @@ System requirements:
 
 1) Python >= 2.5
 2) python-twisted
-3) PyQt4 & Qt4 runtime
+3) PyQt4 & Qt4 runtime, PyQt4 Phonon
 4) python-lxml
 
 
 Installation:
 	Ubuntu:
-		sudo apt-get install python-twisted python-qt4 python-lxml
+		sudo apt-get install python-twisted python-qt4 python-lxml python-qt4-phonon
