@@ -7,7 +7,7 @@ from consts import USER_AGENT
 from time import strftime, gmtime
 
 from twisted.internet.protocol import Protocol
-import socket, re
+import socket, re, traceback
 
 class NoSuchActionError(ValueError):
     pass
@@ -32,6 +32,49 @@ def decode(string):
     """Returns the given HTML with ampersands, quotes and carets encoded."""
     return string.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;','>').replace('&quot;', '"').replace('&#39;', "'")
 
+
+ENVELOPE_TPL = '<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
+ENVELOPE_TPL+= '<s:Body>%s</s:Body></s:Envelope>'
+
+ARG_TPL = "<%(name)s>%(value)s</%(name)s>"
+
+REQ_TPL = ENVELOPE_TPL % '<u:%(actionName)s xmlns:u="%(urn)s">%(args)s</u:%(actionName)s>'
+RESP_TPL = ENVELOPE_TPL % '<u:%(actionName)sResponse xmlns:u="%(urn)s">%(args)s</u:%(actionName)sResponse>'
+
+
+REQ_HEADERS = 'POST %(path)s HTTP/1.0\r\n'
+REQ_HEADERS+= 'HOST: %(host)s\r\n'    
+REQ_HEADERS+= 'CONTENT-LENGTH: %(contentLen)s\r\n'
+REQ_HEADERS+= 'CONTENT-TYPE: text/xml; charset="utf-8"\r\n'
+REQ_HEADERS+= 'USER-AGENT: ' + USER_AGENT + '\r\n' 
+REQ_HEADERS+= 'SOAPACTION: "%(action)s"\r\n\r\n'
+
+RESP_HEADERS = 'HTTP/1.1 200 OK\r\n'
+#RESP_HEADERS+= 'TRANSFER-ENCODING: "chunked"\r\n'
+RESP_HEADERS+= 'CONTENT-TYPE: text/xml; charset=utf-8\r\n'
+RESP_HEADERS+= 'DATE: %(date)s\r\n'        
+RESP_HEADERS+= 'SERVER: ' + USER_AGENT + '\r\n' 
+RESP_HEADERS+= 'CONTENT-LENGTH: %(contentLen)s\r\n'
+RESP_HEADERS+= 'CONNECTION: close\r\n\r\n'
+
+
+def soapSend(host, xml):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect(host)
+        s.sendall(xml)
+        resp = ''
+        while 1:
+            data = s.recv(1024)            
+            if not data: break
+            resp += data
+    except:
+        traceback.print_exc()
+    finally:
+        s.close()
+        
+    return resp
+
 class SOAPResponseParser(object):
     
     def __init__(self, action):
@@ -51,7 +94,20 @@ class SOAPResponseParser(object):
             ret[arg.name] = decode(match.group(1))
             
         return ret
-    
+
+class SOAPRequestParser(object):
+    def parse(self, action, xml):
+        ret = {}
+        for arg in action.argumentList.values():
+            if arg.direction == arg.DIR_OUT: continue
+            
+            match = re.search('<%(tag)s>([^<]*)</%(tag)s>' % {'tag': arg.name}, xml)
+            if not match:
+                continue
+            ret[arg.name] = decode(match.group(1))
+            
+        return ret
+        
 class SOAPSendRequest(Protocol):
     
     def __init__(self, soapRequest):
@@ -64,26 +120,6 @@ class SOAPSendRequest(Protocol):
         print 'SOAP RESPONSE: ' + data
         
 class SOAPClient(object):
-    ENVELOPE_TPL = '<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
-    ENVELOPE_TPL+= '<s:Body>%s</s:Body></s:Envelope>'
-    
-    ARG_TPL = "<%(name)s>%(value)s</%(name)s>\r\n"
-    
-    REQ_TPL = ENVELOPE_TPL % '<u:%(actionName)s xmlns:u="%(urn)s">%(args)s</u:%(actionName)s>'
-    RESP_TPL = ENVELOPE_TPL % '<u:%(actionName)sResponse xmlns:u="%(urn)s">%(args)s</u:%(actionName)sResponse>'
-
-    
-    REQ_HEADERS = 'POST %(path)s HTTP/1.0\r\n'
-    REQ_HEADERS+= 'HOST: %(host)s\r\n'    
-    REQ_HEADERS+= 'CONTENT-LENGTH: %(contentLen)s\r\n'
-    REQ_HEADERS+= 'CONTENT-TYPE: text/xml; charset="utf-8"\r\n'
-    REQ_HEADERS+= 'USER-AGENT: ' + USER_AGENT + '\r\n' 
-    REQ_HEADERS+= 'SOAPACTION: "%(action)s"\r\n\r\n'
-    
-    RESP_HEADERS = 'POST %(path)s HTTP/1.0\r\n'
-    RESP_HEADERS+= 'DATE: %(date)s\r\n'        
-    RESP_HEADERS+= 'SERVER: ' + USER_AGENT + '\r\n' 
-    RESP_HEADERS+= 'CONTENT-LENGTH: %(contentLen)s\r\n'        
 
     def _genRequest(self, service, action, inArgs=None):
         
@@ -92,16 +128,16 @@ class SOAPClient(object):
         args = ''
         if inArgs != None:
             for k, v in inArgs.iteritems(): #zip(inArgs.keys(), inArgs.values()):
-                args += self.ARG_TPL % {'name':str(k), 'value':encode(str(v))}
+                args += ARG_TPL % {'name':str(k), 'value':encode(str(v))}
         
         actionId = service.serviceType +'#'+action.name
                 
         
-        xml = self.REQ_TPL % {'actionName': action.name,
+        xml = REQ_TPL % {'actionName': action.name,
                               'urn': service.serviceType,
                               'args': args}
         
-        hdr = self.REQ_HEADERS % {'path': service.controlURL,
+        hdr = REQ_HEADERS % {'path': service.controlURL,
                               'host': host,
                               'contentLen': len(xml),
                               'action': actionId}
@@ -111,16 +147,17 @@ class SOAPClient(object):
         args = ''
         if outArgs != None:
             for k, v in outArgs.iteritems(): #zip(outArgs.keys(), outArgs.values()):
-                args += self.ARG_TPL % {'name':str(k), 'value':encode(str(v))}
+                args += ARG_TPL % {'name':str(k), 'value':encode(str(v))}
         
         actionId = service.serviceId +'#'+action.name
         
-        xml = self.RESP_TPL % {'actionName': action.name,
+        xml = RESP_TPL % {'actionName': action.name,
                               'urn': actionId,
                               'args': args}
         
-        hdr = self.RESP_HEADERS % {'path': service.controlURL,
-                                   'date': strftime('%a, %d %b %Y %H:%M:%S GMT', gmtime()),
+        hdr = RESP_HEADERS % {'path': service.controlURL,
+                                   #'date': strftime('%a, %d %b %Y %H:%M:%S GMT', gmtime()),
+                                   'date' : 'Tue, 15 May 2012 14:25:28 GMT',
                                    'contentLen': len(xml),
                                    'action': actionId}
         
@@ -132,15 +169,21 @@ class SOAPClient(object):
         #print '\n\nSending SOAP:', req
         #print service.host, service.port
         
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((service.host, service.port))
-        s.sendall(req)
-        resp = ''
-        while 1:
-            data = s.recv(1024)            
-            if not data: break
-            resp += data
-        s.close()
+        #s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#        try:
+#            s.connect((service.host, service.port))
+#            s.sendall(req)
+#            resp = ''
+#            while 1:
+#                data = s.recv(1024)            
+#                if not data: break
+#                resp += data
+#        except:
+#            pass
+#        finally:
+#            s.close()
+
+        resp = soapSend((service.host, service.port), req)
     
         #print resp
         parser = SOAPResponseParser(action)    
@@ -153,3 +196,25 @@ class SOAPClient(object):
             raise NoSuchActionError()
         
         return self.invokeAction(service, action, args)
+    
+class SOAPResponse(object):
+    
+    def generate(self, service, actionName, outArgs=None):
+        
+        action = service.actions[actionName]
+        
+        args = ''
+        if outArgs != None:
+            for k, v in outArgs.iteritems(): #zip(outArgs.keys(), outArgs.values()):
+                args += ARG_TPL % {'name':str(k), 'value':encode(str(v))}
+        
+        actionId = service.serviceId +'#'+action.name
+        
+        xml = RESP_TPL % {'actionName': action.name,
+                           'urn': service.serviceType,
+                           'args': args}
+        
+        hdr = RESP_HEADERS % {'date': strftime('%a, %d %b %Y %H:%M:%S GMT', gmtime()),
+                              'contentLen': len(xml)}
+        
+        return xml

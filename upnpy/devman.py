@@ -4,7 +4,7 @@ Created on 25-02-2012
 @author: morti
 '''
 
-import upnpy, re, copy
+import upnpy, re, copy, socket
 from twisted.internet import reactor
 
 class LocalDeviceManager(object):
@@ -12,16 +12,14 @@ class LocalDeviceManager(object):
         self.ssdp = upnpy.discovery
         
         self._devices = {}
-        #reactor.callLater(13, self._sendAlive) #@UndefinedVariable        
     
-    def _sendAliveForDevice(self, device):
-        self.ssdp.alive(device, maxAge=15)
+    def _sendAliveForDevice(self, device, addr=None):
+        self.ssdp.alive(device, maxAge=15, addr=addr)
     
-    def _sendAlive(self):
+    def _sendAlive(self, addr=None):
         # TODO: send alive message
-        #print 'Sending alive'
         for device in self._devices.values():
-            self._sendAliveForDevice(device)            
+            self._sendAliveForDevice(device, addr)            
         
         reactor.callLater(10, self._sendAlive) #@UndefinedVariable
     
@@ -39,8 +37,13 @@ class LocalDeviceManager(object):
         self.ssdp.byeBye(device)
         del self._devices[device.UDN]
     
-    def searchResponse(self, headers):
-        self._sendAlive()
+    def searchResponse(self, headers, addr):        
+        self._sendAlive(addr)
+    
+    def byeBye(self):
+        print 'HELO'
+        for dev in self._devices:
+            self.ssdp.byeBye(dev)
 
 class RemoteDeviceManager(object):
     

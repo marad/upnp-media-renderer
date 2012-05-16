@@ -168,6 +168,7 @@ class QTReactor(posixbase.PosixReactorBase):
         self.startRunning(installSignalHandlers=installSignalHandlers)
         self.simulate()
         self.qApp.exec_()
+        self.fireSystemEvent("shutdown")
 
     def crash(self):
         if self._crashCall is not None:

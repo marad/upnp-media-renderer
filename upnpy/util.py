@@ -15,7 +15,7 @@ class RegexUtil(object):
     rootDeviceMatcher = re.compile(r"^upnp:rootdevice$")
     deviceTypeMatcher = re.compile(r"^(?:urn:[^:]+:device:)|(?:uuid:.+)")    
     serviceTypeMatcher = re.compile(r"^urn:[^:]+:service:")
-    uuidMatcher = re.compile(r"^(?P<uuid>uuid:[^:]+)(?:::)?(?P<type>.*)$")
+    uuidMatcher = re.compile(r"^(?P<uuid>uuid:[^:]+)(?::)?(?P<type>.*)$")
     baseURLMatcher = re.compile(r"^(?P<baseURL>[^:]+://[^:]+:[0-9]+).*$")
     serverNameMatcher = re.compile(r"^[^:]+://(?P<address>[^:/]+):?(?P<port>[0-9]+)?/")
     

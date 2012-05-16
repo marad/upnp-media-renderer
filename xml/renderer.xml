@@ -6,7 +6,7 @@
 	</specVersion>
 	
 	<device>
-		<deviceType>urn:schemas-upnp-org:device:MediaRenderer:3</deviceType>
+		<deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
 		<friendlyName>Morti's Media Renderer</friendlyName>
 		<manufacturer>Marcin Radoszewski</manufacturer>
 		<manufacturerURL>http://moriturius.wordpress.com/</manufacturerURL>
@@ -14,35 +14,8 @@
 		<modelName>Renderer</modelName>
 		<modelNumber>1</modelNumber>
 		<modelURL></modelURL>
-		<serialNumber>1</serialNumber>
-		<UDN>uuid:%(UUID)s</UDN>
+		<serialNumber>1</serialNumber>		
 		<UPC>MMR</UPC>
-		<serviceList>
-			<service>
-				<serviceType>
-					urn:schemas-upnp-org:service:RenderingControl:3
-				</serviceType>
-				<serviceId>
-					urn:upnp-org:serviceId:RenderingControl
-				</serviceId>
-				<SCPDURL>xml/RenderingControl.xml</SCPDURL>
-				<controlURL></controlURL>
-				<eventSubURL></eventSubURL>
-			</service>
-			<service>
-				<serviceType>
-					urn:schemas-upnp-org:service:ConnectionManager:3
-				</serviceType>
-				<serviceId>
-					urn:upnp-org:serviceId:ConnectionManager
-				</serviceId>
-				<SCPDURL>xml/ConnectionManager.xml</SCPDURL>
-				<controlURL></controlURL>
-				<eventSubURL></eventSubURL>
-			</service>
-
-		</serviceList>
-		<presentationURL>%(presentationURL)s</presentationURL>
 	</device>
 </root>
 

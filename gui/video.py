@@ -12,5 +12,4 @@ class VideoPlayer(Phonon.VideoPlayer):
     def showURL(self, url):
         source = Phonon.MediaSource(url)
         self.play(source)
-    
         

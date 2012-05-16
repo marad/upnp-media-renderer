@@ -32,5 +32,10 @@ def run(runSearch=True):
     
     module.localDeviceManager._sendAlive()
     
+    reactor.addSystemEventTrigger("before", "shutdown", module.localDeviceManager.byeBye)    
+    
     reactor.run()                   #@UndefinedVariable
-    reactor.getThreadPool().stop()  #@UndefinedVariable
+    reactor.getThreadPool().stop()  #@UndefinedVariable    
+
+def stop():
+    reactor.stop()

@@ -4,9 +4,10 @@ Created on 19-02-2012
 @author: morti
 '''
 
-import re
 from lxml import etree
 from upnpy.util import Entity
+import re
+
 
 def _createNodesFromAttrs(obj, attrList, parent):
     #nodes = []
@@ -83,18 +84,19 @@ class Device(object):
         #self.location = deviceDesc.location
     
     def addDevice(self, device):
-        if device.UDN not in self.devices.keys():
+        if device and device.UDN not in self.devices.keys():
             device.parent = self
             self.devices[device.UDN] = device
         
     def addService(self, service):
-        if service.serviceId not in self.services.keys():
+        if service and service.serviceId not in self.services.keys():
             #service.parent = self
             service.device = self
             self.services[service.serviceId] = service
 
     def addIcon(self, icon):
-        self.icons.append(icon)
+        if icon:
+            self.icons.append(icon)
         
     def getService(self, sid):
         return self.services[sid]
@@ -135,6 +137,8 @@ class Device(object):
             node.append(srvList)
             
         return node
+
+        
         
 ########################################################################
 # Represents UPnP device Service
@@ -364,21 +368,21 @@ class StateVariable(object):
         
         valueRange = etree.Element('allowedValueRange')
         addValueRange = False
-        if self.allowedValueRange.max:
-            max = etree.Element('maximum')
-            max.text = self.allowedValueRange.max
-            valueRange.append(max)
+        if self.allowedValueRange.max is not None:
+            maximum = etree.Element('maximum')
+            maximum.text = unicode(self.allowedValueRange.max)
+            valueRange.append(maximum)
             addValueRange = True 
         
-        if self.allowedValueRange.min:
-            min = etree.Element('minimum')
-            min.text = self.allowedValueRange.min
-            valueRange.append(min)
+        if self.allowedValueRange.min is not None:
+            minimum = etree.Element('minimum')
+            minimum.text = unicode(self.allowedValueRange.min)
+            valueRange.append(minimum)
             addValueRange = True
         
-        if self.allowedValueRange.step:
+        if self.allowedValueRange.step is not None:
             step = etree.Element('step')
-            step.text = self.allowedValueRange.step
+            step.text = unicode(self.allowedValueRange.step)
             valueRange.append(step)
             addValueRange = True
         

@@ -42,7 +42,6 @@
 			</service>
 
 		</serviceList>
-		<presentationURL>%(presentationURL)s</presentationURL>
 	</device>
 </root>
 

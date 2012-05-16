@@ -62,6 +62,9 @@ class SSDP(object):
     #NOTIFY_TPL+= 'BOOTID.UPNP.ORG: %s\r\nCONFIGID.UPNP.ORG: %s\r\nSEARCHPORT: %s\r\n'
     NOTIFY_TPL+= '\r\n'
     
+    BYEBYE_DEV_TPL = 'NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: %(nt)s\r\nNTS: ssdp:byebye\r\nUSN: %(uuid)s'
+    BYEBYE_SRV_TPL = 'NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: %(nt)s\r\nNTS: ssdp:byebye\r\nUSN: %(uuid)s::%(nt)s'
+    
     def __init__(self):
         self._cache = {}
         self._lostDevices = {}
@@ -117,10 +120,13 @@ class SSDP(object):
                     data[name] = value
             
             if data['TYPE'] == SSDP.TYPE_SEARCH:
-                upnpy.localDeviceManager.searchResponse(data)
+                #searchDevice = str(data['ST'])
+                #if searchDevice.startswith("uuid:"):
+                #    self.unicast.write(TPL % (device.deviceType, device.UDN+"::"+device.deviceType), addr)
+                upnpy.localDeviceManager.searchResponse(data, addr)
             
             UDN = None    
-            if 'USN' in data.keys():
+            if 'USN' in data.keys():      
                 UDN = RegexUtil.getUUID(data['USN'])
                 
             # Check if we've found new device
@@ -232,12 +238,15 @@ class SSDP(object):
         #self.transport.write(msg, ('192.168.0.114', self.SSDP_PORT))
         #self.transport.write(msg, ('127.0.0.1', self.SSDP_PORT))
     
-    def alive(self, device, maxAge=1800, spreadInTime=True, spreadSpan=30):
+    def alive(self, device, maxAge=1800, spreadInTime=True, spreadSpan=30, addr=None):
         
         # TODO: poprawic aby uruchamial sie watek i rozkladal 
         # komunikaty rownomiernie w czasie
         #print self.descServer.getHost().host
         #print device
+        
+        if addr is None:
+            addr = (self.SSDP_ADDR, self.SSDP_PORT)        
         
         path = '/device/%s.xml' % device.UDN
         baseURL = upnpy.descServer.getBaseURL()
@@ -246,7 +255,7 @@ class SSDP(object):
         device.baseURL = baseURL
         
         TPL = self.NOTIFY_TPL % (maxAge, rootDescURL, "%s", USER_AGENT, "%s")
-        addr = (self.SSDP_ADDR, self.SSDP_PORT)
+        
         self.unicast.write(TPL % ("upnp:rootdevice", device.UDN+"::"+device.deviceType), addr)
         self.unicast.write(TPL % (device.deviceType, device.UDN+"::"+device.deviceType), addr)
         self.unicast.write(TPL % (device.UDN, device.UDN+"::"+device.deviceType), addr)
@@ -269,9 +278,19 @@ class SSDP(object):
 #                                 device.UDN+"::"+device.deviceType)
 #        self.unicast.write(data, (self.SSDP_ADDR, self.SSDP_PORT))
 
-    def byeBye(self, device):
-        # TODO: send bye bye message
-        pass
+    def byeBye(self, deviceOrService):
+        
+        msg = None
+        if isinstance(deviceOrService, Device):
+            msg = self.BYEBYE_DEV_TPL % {'nt': deviceOrService.deviceType, 'uuid': deviceOrService.UDN}
+        
+        elif isinstance(deviceOrService, Service):
+            msg = self.BYEBYE_SRV_TPL % {'nt': deviceOrService.serviceType, 'uuid': deviceOrService.device.UDN}
+        
+        if msg is None: return
+        else:
+            self.unicast.write(msg, (self.SSDP_ADDR, self.SSDP_PORT))
+        
     
     def addDeviceHandler(self, handler):
         self.deviceFoundHandlers.append(handler)

@@ -109,11 +109,11 @@ class MyService(Service):
                 ServiceStateVariable(
                         name='A',
                         dataType=ServiceStateVariable.TYPE_INT,
-                        defaultValue=0))
+                        defaultValue=1))
         self.addStateVariable(descDict={ 
                 'name'     : 'B',
                 'dataType' : ServiceStateVariable.TYPE_INT,
-                'defaultValue': 0})
+                'defaultValue': 2})
         self.addStateVariable(descDict={
                 'name': 'result',
                 'dataType': ServiceStateVariable.TYPE_INT})
@@ -124,8 +124,8 @@ class MyService(Service):
     @Argument('argB', 'in', 'B')
     @Argument('result', 'out', 'result')
     def myAction(self, argA, argB):
-        print "%s + %s = %s" % (argA, argB, argA + argB)
-        return argA + argB
+        #print "%s + %s = %s" % (int(argA), int(argB), int(argA) + int(argB))
+        return {'result': int(argA) + int(argB)}
     
     @Action
     def dummyAction(self):

@@ -4,12 +4,18 @@ Created on 23-02-2012
 @author: morti
 '''
 
-import re, upnpy
-import time
-import urllib2
 from lxml import etree
 from lxml.etree import XMLSyntaxError
-from upnpy.device import Device, Service, Icon, StateVariable, Action, ActionArgument
+from upnpy.device import Device, Service, Icon, StateVariable, Action, \
+    ActionArgument
+from uuid import uuid5
+import re
+import sys
+import time
+import traceback
+import upnpy
+import urllib2
+import uuid
 
 def genRootDesc(device):
     root = etree.Element('root', xmlns="urn:schemas-upnp-org:device-1-0")
@@ -32,8 +38,6 @@ def genRootDesc(device):
 class Entity(object):
     pass
 
-import traceback
-import sys
 
 ns = {
     'dev':'urn:schemas-upnp-org:device-1-0',
@@ -265,7 +269,8 @@ class XmlDescriptionBuilder(object):
                 continue
             
             if len(children) == 0:
-                setattr(obj, tagName, node.text) 
+                if node.text:
+                    setattr(obj, tagName, node.text.strip()) 
             else:
                 nobj = Entity()
                 setattr(obj, tagName, nobj)
@@ -273,6 +278,70 @@ class XmlDescriptionBuilder(object):
                     [nobj for i in xrange( len(children) )],
                     children
                     ))     
+
+
+
+class LocalDeviceBuilder(object):
+    def __init__(self):
+        self.builder = XmlDescriptionBuilder()
+        self.scpdParser = SCPDParser()
+        
+    def deviceFromFile(self, xmlFile, buildServices=True, buildSubDevices=True, rootDeviceObject=None):
+        with open(xmlFile) as f:
+            xml = f.read()
+        
+        doc = etree.fromstring(xml)
+        rootDevNode = doc.xpath('/dev:root/dev:device', namespaces=ns)[0]
+        
+        dev = self._buildDevice(rootDevNode, buildServices, buildSubDevices, rootDeviceObject)
+        return dev
+    
+    def serviceFromFile(self, serviceType, serviceId, xmlFile, serviceObject=None):
+        if serviceObject is None:
+            srv = Service()
+        else:
+            srv = serviceObject
+            
+        srv.serviceType = serviceType
+        srv.serviceId = serviceId
+        with open(xmlFile) as scpdFile:
+            xml = scpdFile.read()
+            self.scpdParser.parse(srv, xml)
+        return srv
+        
+    def _buildDevice(self, devNode, buildServices, buildSubDevices, rootDeviceObject=None):
+        if rootDeviceObject is None:
+            dev = Device()
+        else:
+            dev = rootDeviceObject
+                    
+        self.builder.parseNode(devNode, dev, ['deviceList', 'iconList', 'serviceList'])
+        self.builder.parseIcons(devNode, dev)
+        
+        if not hasattr(dev, 'UDN') or dev.UDN == None:
+            dev.UDN = "uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, dev.friendlyName+ str(time.time()) ))
+        
+        if buildServices:
+            srvNodeList = devNode.xpath('dev:serviceList/dev:service', namespaces=ns)
+            for srvNode in srvNodeList:
+                srv = self._buildService(srvNode)
+                dev.addService(srv)
+        
+        if buildSubDevices:
+            subDevNodeList = devNode.xpath('dev:deviceList/dev:device', namespaces=ns)
+            for subDevNode in subDevNodeList:
+                dev = self._buildDevice(subDevNode, buildServices, buildSubDevices)
+                dev.addDevice(dev)
+        return dev
+        
+    def _buildService(self, srvNode):
+        srv = Service()
+        self.builder.parseNode(srvNode, srv)
+        
+        with open(srv.SCPDURL) as scpdFile:
+            xml = scpdFile.read()
+            self.scpdParser.parse(srv, xml)
+        return srv
 
 class DIDLParser(object):
     
