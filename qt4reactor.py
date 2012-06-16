@@ -19,6 +19,8 @@ Maintainer: U{Itamar Shtull-Trauring<mailto:twisted@itamarst.org>}
 Port to QT4: U{Gabe Rudy<mailto:rudy@goldenhelix.com>}
 """
 
+import upnpy
+
 __all__ = ['install']
 
 # System Imports
@@ -135,7 +137,8 @@ class QTReactor(posixbase.PosixReactorBase):
 
         if not self.running:
             self.running = 1
-            self.qApp.exit_loop()
+            #self.qApp.exit_loop()
+            self.qApp.exit( 0 )
             return
         self.runUntilCurrent()
 
@@ -168,6 +171,7 @@ class QTReactor(posixbase.PosixReactorBase):
         self.startRunning(installSignalHandlers=installSignalHandlers)
         self.simulate()
         self.qApp.exec_()
+        upnpy.localDeviceManager.byeBye()
         self.fireSystemEvent("shutdown")
 
     def crash(self):

@@ -7,7 +7,7 @@ Created on 08-05-2012
 import upnpy
 from upnpy.soap import SOAPClient
 from upnpy.xmlutil import DIDLParser
-from gui.video import VideoPlayer
+#from gui.video import VideoPlayer
 
 from PyQt4.QtGui import QWidget, QVBoxLayout, QTreeWidget, QTreeWidgetItem, QLabel, QTextEdit
 from PyQt4.QtGui import QPushButton, QGroupBox, QLineEdit, QMessageBox, QComboBox
@@ -130,7 +130,7 @@ class SimpleServerBrowser(QWidget):
                 newItem = QTreeWidgetItem(treeItem, [ch.title + ', ' +ch.attr['id']])
                 newItem.object = ch
         elif item.type == DIDLParser.TYPE_ITEM:
-            self.emit(SIGNAL("play"), item.res)
+            self.emit(SIGNAL("play"), item.res, item.didl)
         
         
     

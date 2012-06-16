@@ -53,7 +53,11 @@ didlns = {
 def _xpath(node, xpath):
     list = node.xpath(xpath, namespaces=ns)
     if len(list) > 0:
-        return list[0]
+        elem = list[0]
+        if isinstance(elem, basestring):
+            return elem.strip()
+        else:
+            return elem
     else:
         return None
 
@@ -365,6 +369,7 @@ class DIDLParser(object):
             obj = Entity()
             obj.type = DIDLParser.TYPE_ITEM
             self.parseNode(item, obj)
+            obj.didl = etree.tostring(item)
             result.append(obj)
         
         return result

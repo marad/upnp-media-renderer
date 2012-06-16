@@ -8,7 +8,7 @@
 	<URLBase>%(URLBase)s</URLBase>
 	
 	<device>
-		<deviceType>urn:schemas-upnp-org:device:MediaRenderer:3</deviceType>
+		<deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
 		<friendlyName>Morti's Media Renderer</friendlyName>
 		<manufacturer>Marcin Radoszewski</manufacturer>
 		<manufacturerURL>http://moriturius.wordpress.com/</manufacturerURL>
@@ -22,7 +22,7 @@
 		<serviceList>
 			<service>
 				<serviceType>
-					urn:schemas-upnp-org:service:RenderingControl:3
+					urn:schemas-upnp-org:service:RenderingControl:1
 				</serviceType>
 				<serviceId>
 					urn:upnp-org:serviceId:RenderingControl
@@ -33,7 +33,7 @@
 			</service>
 			<service>
 				<serviceType>
-					urn:schemas-upnp-org:service:ConnectionManager:3
+					urn:schemas-upnp-org:service:ConnectionManager:1
 				</serviceType>
 				<serviceId>
 					urn:upnp-org:serviceId:ConnectionManager

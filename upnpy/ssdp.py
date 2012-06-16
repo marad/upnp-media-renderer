@@ -28,7 +28,7 @@ class SSDPUnicast(DatagramProtocol):
         self.packetHandler = ssdpPacketHandler
     
     def datagramReceived(self, datagram, addr):
-        #print "Unicast data!"
+#        print "Unicast data!"
         self.packetHandler.datagramReceived(datagram, addr)
 
 class SSDPMulticast(DatagramProtocol):
@@ -38,7 +38,7 @@ class SSDPMulticast(DatagramProtocol):
         self.packetHandler = ssdpPacketHandler
     
     def datagramReceived(self, datagram, addr):
-        #print "Multicast data!", datagram
+#        print "Multicast data!", datagram
         self.packetHandler.datagramReceived(datagram, addr)
 
      
@@ -62,8 +62,8 @@ class SSDP(object):
     #NOTIFY_TPL+= 'BOOTID.UPNP.ORG: %s\r\nCONFIGID.UPNP.ORG: %s\r\nSEARCHPORT: %s\r\n'
     NOTIFY_TPL+= '\r\n'
     
-    BYEBYE_DEV_TPL = 'NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: %(nt)s\r\nNTS: ssdp:byebye\r\nUSN: %(uuid)s'
-    BYEBYE_SRV_TPL = 'NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: %(nt)s\r\nNTS: ssdp:byebye\r\nUSN: %(uuid)s::%(nt)s'
+    BYEBYE_DEV_TPL = 'NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNTS: ssdp:byebye\r\nUSN: %(uuid)s\r\nNT: %(nt)s\r\n\r\n'
+    BYEBYE_SRV_TPL = 'NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNTS: ssdp:byebye\r\nUSN: %(uuid)s::%(nt)s\r\nNT: %(nt)s\r\n\r\n'
     
     def __init__(self):
         self._cache = {}
@@ -278,18 +278,54 @@ class SSDP(object):
 #                                 device.UDN+"::"+device.deviceType)
 #        self.unicast.write(data, (self.SSDP_ADDR, self.SSDP_PORT))
 
-    def byeBye(self, deviceOrService):
+    def byeDevice(self, device):
+        self.alive(device, maxAge=0)
+        rotmsg = self.BYEBYE_SRV_TPL % {'nt': "upnp:rootdevice", 'uuid': device.UDN}
+        msg = self.BYEBYE_SRV_TPL % {'nt': device.deviceType, 'uuid': device.UDN}
+        devmsg = self.BYEBYE_DEV_TPL % {'nt': device.UDN, 'uuid': device.UDN}
         
+        if not device.embedded:
+            self.unicast.write(rotmsg, (self.SSDP_ADDR, self.SSDP_PORT))
+        self.unicast.write(msg, (self.SSDP_ADDR, self.SSDP_PORT))
+        
+        for dev in device.devices.values():
+            self.byeDevice(dev)
+        
+        for srv in device.services.values():
+            self.byeService(srv)
+            
+        self.unicast.write(devmsg, (self.SSDP_ADDR, self.SSDP_PORT))
+        
+            
+    def byeService(self, service):
+        msg = self.BYEBYE_SRV_TPL % {'nt': service.serviceType, 'uuid': service.device.UDN}
+        self.unicast.write(msg, (self.SSDP_ADDR, self.SSDP_PORT))
+    
+    def byeBye(self, deviceOrService):
+        print "Bye ", deviceOrService
         msg = None
         if isinstance(deviceOrService, Device):
-            msg = self.BYEBYE_DEV_TPL % {'nt': deviceOrService.deviceType, 'uuid': deviceOrService.UDN}
+            self.byeDevice(deviceOrService)
+#            print "Removing device"
+#            msg = self.BYEBYE_SRV_TPL % {'nt': deviceOrService.deviceType, 'uuid': deviceOrService.UDN}
+#            if not deviceOrService.embedded:
+#                rotmsg = self.BYEBYE_SRV_TPL % {'nt': "upnp:rootdevice", 'uuid': deviceOrService.UDN}
+#                self.unicast.write(rotmsg, (self.SSDP_ADDR, self.SSDP_PORT))
+#                
+#            devmsg = self.BYEBYE_DEV_TPL % {'nt': deviceOrService.UDN, 'uuid': deviceOrService.UDN}
+#            self.unicast.write(rotmsg, (self.SSDP_ADDR, self.SSDP_PORT))
+#            
+#            for srv in deviceOrService.services.values():
+#                self.byeBye(srv)
+            
         
         elif isinstance(deviceOrService, Service):
-            msg = self.BYEBYE_SRV_TPL % {'nt': deviceOrService.serviceType, 'uuid': deviceOrService.device.UDN}
+            self.byeService(deviceOrService)
+#            msg = self.BYEBYE_SRV_TPL % {'nt': deviceOrService.serviceType, 'uuid': deviceOrService.device.UDN}
         
-        if msg is None: return
-        else:
-            self.unicast.write(msg, (self.SSDP_ADDR, self.SSDP_PORT))
+#        if msg is None: return
+#        else:
+#            self.unicast.write(msg, (self.SSDP_ADDR, self.SSDP_PORT))
         
     
     def addDeviceHandler(self, handler):

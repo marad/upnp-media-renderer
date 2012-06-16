@@ -15,6 +15,12 @@ class NoSuchActionError(ValueError):
 class EmptyResponseException(Exception):
     pass
 
+class InvalidResponseException(Exception):
+    pass
+
+class MissingOutputArgumentException(Exception):
+    def __init__(self, argName):
+        self.argName = argName
 
 htmlCodes = (
     ('&', '&amp;'),
@@ -50,7 +56,6 @@ REQ_HEADERS+= 'USER-AGENT: ' + USER_AGENT + '\r\n'
 REQ_HEADERS+= 'SOAPACTION: "%(action)s"\r\n\r\n'
 
 RESP_HEADERS = 'HTTP/1.1 200 OK\r\n'
-#RESP_HEADERS+= 'TRANSFER-ENCODING: "chunked"\r\n'
 RESP_HEADERS+= 'CONTENT-TYPE: text/xml; charset=utf-8\r\n'
 RESP_HEADERS+= 'DATE: %(date)s\r\n'        
 RESP_HEADERS+= 'SERVER: ' + USER_AGENT + '\r\n' 
@@ -58,11 +63,11 @@ RESP_HEADERS+= 'CONTENT-LENGTH: %(contentLen)s\r\n'
 RESP_HEADERS+= 'CONNECTION: close\r\n\r\n'
 
 
-def soapSend(host, xml):
+def soapSend(address, soapMessage):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        s.connect(host)
-        s.sendall(xml)
+        s.connect(address)
+        s.sendall(soapMessage)
         resp = ''
         while 1:
             data = s.recv(1024)            
@@ -82,15 +87,13 @@ class SOAPResponseParser(object):
         
     def parse(self, xml):
         
-        #print "\n\nReceived XML:",xml
-        
         ret = {}
         for arg  in self.action.argumentList.values():
             if arg.direction == arg.DIR_IN: continue
             
-            match = re.search('<%(tag)s>([^<]*)</%(tag)s>' % {'tag': arg.name}, xml)
+            match = re.search( '<[^:]*:?%(tag)s>([^<]*)</[^:]*:?%(tag)s>' % {'tag': arg.name}, xml)
             if not match:
-                raise EmptyResponseException()
+                raise MissingOutputArgumentException(arg.name)
             ret[arg.name] = decode(match.group(1))
             
         return ret
@@ -101,7 +104,7 @@ class SOAPRequestParser(object):
         for arg in action.argumentList.values():
             if arg.direction == arg.DIR_OUT: continue
             
-            match = re.search('<%(tag)s>([^<]*)</%(tag)s>' % {'tag': arg.name}, xml)
+            match = re.search( '<[^:]*:?%(tag)s>([^<]*)</[^:]*:?%(tag)s>' % {'tag': arg.name}, xml)
             if not match:
                 continue
             ret[arg.name] = decode(match.group(1))
@@ -132,7 +135,6 @@ class SOAPClient(object):
         
         actionId = service.serviceType +'#'+action.name
                 
-        
         xml = REQ_TPL % {'actionName': action.name,
                               'urn': service.serviceType,
                               'args': args}
@@ -143,51 +145,36 @@ class SOAPClient(object):
                               'action': actionId}
         return hdr + xml
     
-    def _genResponse(self, service, action, outArgs=None):
-        args = ''
-        if outArgs != None:
-            for k, v in outArgs.iteritems(): #zip(outArgs.keys(), outArgs.values()):
-                args += ARG_TPL % {'name':str(k), 'value':encode(str(v))}
-        
-        actionId = service.serviceId +'#'+action.name
-        
-        xml = RESP_TPL % {'actionName': action.name,
-                              'urn': actionId,
-                              'args': args}
-        
-        hdr = RESP_HEADERS % {'path': service.controlURL,
-                                   #'date': strftime('%a, %d %b %Y %H:%M:%S GMT', gmtime()),
-                                   'date' : 'Tue, 15 May 2012 14:25:28 GMT',
-                                   'contentLen': len(xml),
-                                   'action': actionId}
-        
-        return hdr + xml
+#    def _genResponse(self, service, action, outArgs=None):
+#        args = ''
+#        if outArgs != None:
+#            for k, v in outArgs.iteritems(): #zip(outArgs.keys(), outArgs.values()):
+#                args += ARG_TPL % {'name':str(k), 'value':encode(str(v))}
+#        
+#        actionId = service.serviceId +'#'+action.name
+#        
+#        xml = RESP_TPL % {'actionName': action.name,
+#                              'urn': actionId,
+#                              'args': args}
+#        
+#        hdr = RESP_HEADERS % {'path': service.controlURL,
+#                                   #'date': strftime('%a, %d %b %Y %H:%M:%S GMT', gmtime()),
+#                                   'date' : 'Tue, 15 May 2012 14:25:28 GMT',
+#                                   'contentLen': len(xml),
+#                                   'action': actionId}
+#        
+#        return hdr + xml
     
     def invokeAction(self, service, action, args):        
         req = self._genRequest(service, action, args)
-        
-        #print '\n\nSending SOAP:', req
-        #print service.host, service.port
-        
-        #s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#        try:
-#            s.connect((service.host, service.port))
-#            s.sendall(req)
-#            resp = ''
-#            while 1:
-#                data = s.recv(1024)            
-#                if not data: break
-#                resp += data
-#        except:
-#            pass
-#        finally:
-#            s.close()
 
         resp = soapSend((service.host, service.port), req)
     
-        #print resp
-        parser = SOAPResponseParser(action)    
-        return parser.parse(resp[resp.find('<'):])
+        parser = SOAPResponseParser(action)
+        try:    
+            return parser.parse(resp[resp.find('<'):])
+        except:
+            raise InvalidResponseException()
     
     def invokeActionByName(self, service, actionName, args):
         action = service.actions[actionName]

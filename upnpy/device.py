@@ -138,7 +138,8 @@ class Device(object):
             
         return node
 
-        
+    def toXML(self):
+        return self.genDeviceDesc()
         
 ########################################################################
 # Represents UPnP device Service

@@ -38,4 +38,5 @@ def run(runSearch=True):
     reactor.getThreadPool().stop()  #@UndefinedVariable    
 
 def stop():
+    #module.localDeviceManager.byeBye()
     reactor.stop()

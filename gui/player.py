@@ -8,7 +8,9 @@ from PyQt4.QtGui import QWidget, QHBoxLayout, QMainWindow, QDockWidget
 from PyQt4.QtCore import SIGNAL, Qt
 
 from gui.browser import SimpleServerBrowser
-from gui.video import VideoPlayer
+#from gui.video import VideoPlayer
+from gui import video
+import upnpy
 
 class Player(QMainWindow):
 
@@ -20,24 +22,39 @@ class Player(QMainWindow):
     def setupUI(self):
         
         self.browser = browser = SimpleServerBrowser()
-        self.player = player = VideoPlayer()        
+        self.player = player = video.Player() #VideoPlayer()        
         
         dock = QDockWidget(u'Przeglądarka serwerów', self)
+        dock.setContentsMargins(0, 0, 0, 0)
+        
         dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
-        dock.setWidget(browser)
+        dock.setWidget(browser)        
         
-        self.addDockWidget(Qt.LeftDockWidgetArea, dock)
+        self.addDockWidget(Qt.LeftDockWidgetArea, dock)        
+                
+        #self.setCentralWidget(player.videoWidget())
+        self.setCentralWidget(player.videoWidget)
         
-        self.setCentralWidget(player.videoWidget())
+        dock = QDockWidget(self)
+        dock.setAllowedAreas(Qt.BottomDockWidgetArea)
+        dock.setWidget(player.controlPanel)
+        
+        dock.setFloating(False)
+        dock.setFeatures(QDockWidget.NoDockWidgetFeatures)
+        self.addDockWidget(Qt.BottomDockWidgetArea, dock)
     
-        QWidget.connect(self.browser, SIGNAL("play"), self.player.showURL)
+        QWidget.connect(self.browser, SIGNAL("play"), self.play)
         self.resize(800, 480)
-    
-    def play(self, url):
-        if self.player.isPaused():
-            self.player.pause()
-        else:
-            self.player.showURL(url)
+
+    def itemSelected(self, url, didl):
+        self.play(url)
+        self.currentDIDL = didl
+        
+    def play(self, url = None, didl = None):
+        if url:
+            self.player.setCurrentSource(url, didl)
+        self.player.play()
+
     
     def stop(self):
         self.player.stop()
@@ -46,5 +63,13 @@ class Player(QMainWindow):
         self.player.pause()
     
     def seek(self, target, unit):
-        #self.player.seek()
-        pass
+        self.player.seek(target, unit)
+    
+    def setCurrentSource(self, url):
+        self.player.setCurrentSource(url)
+        
+    def isPlaying(self):
+        return self.player.isPlaying()
+    
+    def getPosition(self):
+        return self.player.getPosition()

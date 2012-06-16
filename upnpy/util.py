@@ -6,6 +6,18 @@ Created on 23-02-2012
 
 import re, socket
 
+def convertFromBoolean(value):
+    try:
+        i = int( value )
+        return i != 0
+    except:
+        if isinstance(value, str):
+            return value.lower() == "true" or value == "yes"
+        elif isinstance(value, unicode):
+            return value.lower() == u"true" or value == "yes"
+        else:
+            return None
+
 class Entity(object):
     pass
 

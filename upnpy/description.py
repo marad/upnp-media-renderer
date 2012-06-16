@@ -4,7 +4,7 @@ Created on 14-05-2012
 @author: morti
 '''
 
-import upnpy, re
+import upnpy, re, traceback
 
 from lxml import etree
 from xmlutil import genRootDesc
@@ -19,10 +19,10 @@ from upnpy import consts
 from time import strftime, gmtime
 
 class DescriptionServerPage(Resource):
-    PATTERN_SERVICE_PATH = re.compile('/(?P<type>[^/]+)/(?P<uuid>[^/.]+)(/(?P<serviceId>[^./]+))?')
-    PATTERN_DEVICE_PATH = re.compile('/(?P<type>[^/]+)/(?P<uuid>[^.]+).xml')
+    RESOURCE_PATH_PATTERN = re.compile('/(?P<type>[^/]+)/(?P<uuid>[^/.]+)(/(?P<serviceId>[^./]+))?')
+    #PATTERN_DEVICE_PATH = re.compile('/(?P<type>[^/]+)/(?P<uuid>[^.]+).xml')
     
-    isLeaf = True
+    isLeaf = True # This is important - don't delete it again future me!
     def __init__(self):
         self.ssdp = upnpy.discovery
         self.localDevices = upnpy.localDeviceManager
@@ -32,7 +32,7 @@ class DescriptionServerPage(Resource):
     def render_GET(self, request):
         #print 'Desc server got request:', request.path
         
-        match = self.PATTERN_SERVICE_PATH.search(request.path)
+        match = self.RESOURCE_PATH_PATTERN.search(request.path)
         
         if not match:
             # TODO: return actual SOAP with error
@@ -67,7 +67,7 @@ class DescriptionServerPage(Resource):
     def render_POST(self, request):
         print request
         
-        match = self.PATTERN_SERVICE_PATH.search(request.path)
+        match = self.RESOURCE_PATH_PATTERN.search(request.path)
         
         if not match:
             # TODO: return actual SOAP with error
@@ -80,6 +80,7 @@ class DescriptionServerPage(Resource):
         if resType == "control":
             
             headers = request.getAllHeaders()
+            #print headers['soapaction']
             soapAction = str(headers['soapaction']).strip('"').strip("'")
             actionName = soapAction.split("#")[1]
             
@@ -102,9 +103,12 @@ class DescriptionServerPage(Resource):
                 request.responseHeaders.setRawHeaders('CONTENT-TYPE', ['text/xml'])
                 request.responseHeaders.setRawHeaders('SERVER', [consts.USER_AGENT])
                 request.responseHeaders.setRawHeaders('DATE', [strftime('%a, %d %b %Y %H:%M:%S GMT', gmtime())])
+                
+                print resp
                 return str(resp)
                 
             except AttributeError:
+                traceback.print_exc()
                 # TODO: send SOAP error message
                 return "ERROR - No action"
             

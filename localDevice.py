@@ -48,20 +48,21 @@ class ConnectionManager(Service):
         
         
 class RenderingControl(Service):
-    def __init__(self):
+    def __init__(self, player):
         Service.__init__(self)
         builder.serviceFromFile(
             "urn:schemas-upnp-org:service:RenderingControl:1",
             "urn:upnp-org:serviceId:RenderingControl",
             "xml/RenderingControl.xml", self)
+        self.player = player
     
     def GetMute(self, InstanceID, Channel):
         return {
-            "CurrentMute": "0"
+            "CurrentMute": self.player.getMute()
             }
     
-    def SetMute(self, InstanceID, DesiredMute, Channel):
-        pass
+    def SetMute(self, InstanceID, DesiredMute, Channel):        
+        self.player.setMute(DesiredMute)
     
     def SelectPreset(self, InstanceID, PresetName):   
         pass
@@ -73,11 +74,12 @@ class RenderingControl(Service):
         
     def GetVolume(self, InstanceID, Channel): # 4
         return {
-            "CurrentVolume": "100"
+            "CurrentVolume": self.player.getVolume()
             }
         
     def SetVolume(self, InstanceID, DesiredVolume, Channel):
-        pass
+        print DesiredVolume
+        self.player.setVolume(int(DesiredVolume))
     
 class AVTransport(Service):
     def __init__(self, player):
@@ -87,14 +89,14 @@ class AVTransport(Service):
             "urn:schemas-upnp-org:service:AVTransport:1",
             "urn:upnp-org:serviceId:AVTransport",
             "xml/AVTransport.xml", self)
-    
+        self.uri = None
+        self.nextURI = None
+        self.nextURIMetaData = None
     
     def Play(self, InstanceID, Speed): # 6
-        print 'Playing', self.uri
-        self.player.play(self.uri)
+        self.player.play()
     
     def Seek(self, InstanceID, Target, Unit):
-        print Target, Unit
         self.player.seek(Target, Unit)
     
     def Pause(self, InstanceID):
@@ -110,34 +112,37 @@ class AVTransport(Service):
         pass
     
     def GetPositionInfo(self, InstanceID):
+        
+        pos = self.player.getPosition()
+        tm = self.player.getTotalTime()
         return {
-            "AbsTime": "00:00:00",
-            "TrackDuration": "00:00:00",
+            "AbsTime": pos,
+            "TrackDuration": tm,
             "TrackURI": self.uri,
             "AbsCount": "1",
             "Track": "1",
-            "TrackMetaData": '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dlna="urn:schemas-dlna-org:metadata-1-0/"><item id="29" parentID="8" restricted="1"><upnp:class>object.item.videoItem</upnp:class><dc:title>Track Metadata :)</dc:title><dc:creator>Dummy Data</dc:creator><upnp:artist>Unknown Artist</upnp:artist><upnp:album>Unknown Album</upnp:album><res protocolInfo="http-get:*:video/x-flv:*" bitrate="378" sampleFrequency="44100" duration="0:05:15.000">http://www.wp.pl/</res></item></DIDL-Lite>',
+            "TrackMetaData": self.player.currentDIDL,
             "RelCount": "1",
-            "RelTime": "",
+            "RelTime": pos,
             }
         
     def GetMediaInfo(self, InstanceID): # 3
         return {
-            "NextURI": "NOT_IMPLEMENTED",
+            "NextURI": self.nextURI,
             "CurrentURI": self.uri,
-            "NextURIMetaData": "NOT_IMPLEMENTED",
+            "NextURIMetaData": self.nextURIMetaData,
             "RecordMedium": "NOT_IMPLEMENTED",
             "PlayMedium": "NONE",
             "NrTracks": "0",
             "WriteStatus": "NOT_IMPLEMENTED",
-            "MediaDuration": "00:00:00",
-            "CurrentURIMetaData": "",
+            "MediaDuration": self.player.getTotalTime(),
+            "CurrentURIMetaData": self.player.currentDIDL,
             }
         
     def GetTransportInfo(self, InstanceID): # 2
         state = "STOPPED"
         
-        if self.player.player.isPlaying():
+        if self.player.isPlaying():
             state = "PLAYING"
             
         return {
@@ -150,7 +155,7 @@ class AVTransport(Service):
         return {
             "RecQualityModes": "NONE,NETWORK,HDD,CD-DA,UNKNOWN",
             "RecMedia": "NOT_IMPLEMENTED",
-            "PlayMedia": "NOT_IMPLEMENTED",
+            "PlayMedia": "NONE,NETWORK,HDD,UNKNOWN",
             }
         
     def GetTransportSettings(self, InstanceID):
@@ -162,7 +167,11 @@ class AVTransport(Service):
     def SetAVTransportURI(self, InstanceID, CurrentURIMetaData, CurrentURI): # 5
         print "URI Set:", CurrentURI
         self.uri = CurrentURI
-        
+        self.player.setCurrentSource(self.uri)
+    
+    def SetNextAVTransportURI(self, InstanceID, NextURI, NextURIMetaData):
+        self.nextURI = NextURI
+        self.nextURIMetaData = NextURIMetaData
         
 if __name__ == '__main__':
     
@@ -188,8 +197,8 @@ if __name__ == '__main__':
     srv.serviceId = 'AddService'
     dev.addService(srv)
     dev.addService(ConnectionManager())
-    dev.addService(RenderingControl())
-    dev.addService(AVTransport(window))
+    dev.addService(RenderingControl(window.player))
+    dev.addService(AVTransport(window.player))
     devs.addDevice(dev)
     
     upnpy.run()

@@ -14,7 +14,7 @@ class LocalDeviceManager(object):
         self._devices = {}
     
     def _sendAliveForDevice(self, device, addr=None):
-        self.ssdp.alive(device, maxAge=15, addr=addr)
+        self.ssdp.alive(device, maxAge=1800, addr=addr)
     
     def _sendAlive(self, addr=None):
         # TODO: send alive message
@@ -41,8 +41,7 @@ class LocalDeviceManager(object):
         self._sendAlive(addr)
     
     def byeBye(self):
-        print 'HELO'
-        for dev in self._devices:
+        for dev in self._devices.values():
             self.ssdp.byeBye(dev)
 
 class RemoteDeviceManager(object):
