@@ -64,9 +64,26 @@ class DescriptionServerPage(Resource):
         service = device.services[serviceId]
         return etree.tostring(service.genSCPD())
     
-    def render_POST(self, request):
-        print request
+
+    def render_SUBSCRIBE(self, request):
+        #print request
+        print request.getAllHeaders()
+        #print request.content.getvalue()
         
+        request.responseHeaders.setRawHeaders('CONTENT-TYPE', ['text/xml'])
+        request.responseHeaders.setRawHeaders('CONTENT-LENGTH', [0])
+        request.responseHeaders.setRawHeaders('SERVER', [consts.USER_AGENT])
+        request.responseHeaders.setRawHeaders('DATE', [strftime('%a, %d %b %Y %H:%M:%S GMT', gmtime())])
+        request.responseHeaders.setRawHeaders('SID', ['uuid:550e8400-e29b-41d4-a716-446655440000'])
+        request.responseHeaders.setRawHeaders('TIMEOUT', [1800])
+        
+        return ""
+    
+    def render_UNSUBSCRIBE(self, request):
+        return ""
+    
+    def render_POST(self, request):
+    
         match = self.RESOURCE_PATH_PATTERN.search(request.path)
         
         if not match:
@@ -84,7 +101,7 @@ class DescriptionServerPage(Resource):
             soapAction = str(headers['soapaction']).strip('"').strip("'")
             actionName = soapAction.split("#")[1]
             
-            print 'Action:', actionName      
+            #print 'Action:', actionName      
         
             device = self.localDevices.getDevice(uuid)
             service = device.services[serviceId]
@@ -104,7 +121,7 @@ class DescriptionServerPage(Resource):
                 request.responseHeaders.setRawHeaders('SERVER', [consts.USER_AGENT])
                 request.responseHeaders.setRawHeaders('DATE', [strftime('%a, %d %b %Y %H:%M:%S GMT', gmtime())])
                 
-                print resp
+                #print resp
                 return str(resp)
                 
             except AttributeError:

@@ -289,6 +289,7 @@ class LocalDeviceBuilder(object):
     def __init__(self):
         self.builder = XmlDescriptionBuilder()
         self.scpdParser = SCPDParser()
+     
         
     def deviceFromFile(self, xmlFile, buildServices=True, buildSubDevices=True, rootDeviceObject=None):
         with open(xmlFile) as f:

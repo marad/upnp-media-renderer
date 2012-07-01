@@ -56,37 +56,20 @@ class ServerListModel(QAbstractListModel):
         return self.data[index-1]
 
 class SimpleServerBrowser(QWidget):
-    '''
-    classdocs
-    '''
-
     def __init__(self, parent = None):
-        '''
-        Constructor
-        '''
         QWidget.__init__(self, parent = parent)
-        
         self.setupUI()
-        
         self.soap = SOAPClient();
-        filter = 'MediaServer'
         
     def setupUI(self):
-        
-        #self.video = VideoPlayer()
-        #self.video.show()
-        
         vlay = QVBoxLayout()
-        
+        self.servers = ServerListModel()
         self.serversCombo = combo = QComboBox()
-        combo.addItem('Wybierz serwer')
-        self.servers = ServerListModel()  
+        #combo.addItem('Wybierz serwer')
         combo.setModel(self.servers)
         vlay.addWidget(combo)
         
         self.tree = tree = QTreeWidget()
-        
-        
         vlay.addWidget(tree)
         self.setLayout(vlay)
         
@@ -94,7 +77,6 @@ class SimpleServerBrowser(QWidget):
         QWidget.connect( self.tree, SIGNAL("itemDoubleClicked(QTreeWidgetItem*,int)"), self.itemDblClicked)
     
     def _queryServer(self, objectId):
-        #device = self.servers.data[self.serversCombo.currentIndex()-1]
         device = self.servers.getItem(self.serversCombo.currentIndex())
         service = device.findService("ContentDirectory")
         resp = self.soap.invokeActionByName(service, 'Browse', 
@@ -120,9 +102,6 @@ class SimpleServerBrowser(QWidget):
         
     def itemDblClicked(self, treeItem, column):
         item = treeItem.object
-        
-        #print item.attr
-        #print dir(item)
         if item.type == DIDLParser.TYPE_CONTAINER and treeItem.childCount() == 0:
             iid = item.attr['id']            
             r = self._queryServer(iid)

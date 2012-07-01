@@ -6,7 +6,7 @@ Created on 13-05-2012
 import re
 from PyQt4.phonon import Phonon
 from PyQt4.QtCore import QUrl, SIGNAL
-from PyQt4.QtGui import QWidget, QVBoxLayout, QHBoxLayout, QPushButton
+from PyQt4.QtGui import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QIcon
 from upnpy.util import convertFromBoolean
 
 #class VideoPlayer(Phonon.VideoPlayer):
@@ -41,31 +41,32 @@ class Player(QWidget):
     
     def __init__(self, parent = None):
         QWidget.__init__(self, parent = parent)
-        self.mediaObject = Phonon.MediaObject(self)
-        self.videoWidget = Phonon.VideoWidget(self)
-        self.audioOutput = Phonon.AudioOutput(self)
-        
         self.currentSource = None
         
         self.currentDIDL = None
         self.nextSource = None
         self.prevSource = None
         
-        Phonon.createPath(self.mediaObject, self.videoWidget)
-        Phonon.createPath(self.mediaObject, self.audioOutput)
         self.setupUI()
     
     def setupUI(self):
-        vlay = QVBoxLayout()
+        self.mediaObject = Phonon.MediaObject(self)
+        self.videoWidget = Phonon.VideoWidget(self)
+        self.audioOutput = Phonon.AudioOutput(self)
+        
+        Phonon.createPath(self.mediaObject, self.videoWidget)
+        Phonon.createPath(self.mediaObject, self.audioOutput)
         
         self.controlPanel = QWidget(self)
-        controlLayout = QHBoxLayout()
         
-        self.previousButton = QPushButton("Prev")
-        self.playButton = QPushButton("Play")
-        self.pauseButton = QPushButton("Pause")
-        self.stopButton = QPushButton("Stop")
-        self.nextButton = QPushButton("Next")
+        self.previousButton = QPushButton(QIcon("icons/previous.png"), "")
+        self.playButton = QPushButton(QIcon("icons/play.png"), "")
+        self.pauseButton = QPushButton(QIcon("icons/pause.png"), "")
+        self.stopButton = QPushButton(QIcon("icons/stop.png"), "")
+        self.nextButton = QPushButton(QIcon("icons/next.png"), "")
+                
+        vlay = QVBoxLayout()        
+        controlLayout = QHBoxLayout()
         
         controlLayout.addStretch()
         controlLayout.addWidget(self.playButton)
@@ -74,7 +75,6 @@ class Player(QWidget):
         controlLayout.addStretch()
         
         controlLayout.setContentsMargins(0, 0, 0, 0)
-        
         
         seeklay = QVBoxLayout()
         seeklay.setContentsMargins(0, 0, 0, 0)
@@ -100,7 +100,7 @@ class Player(QWidget):
         
         QWidget.connect(self.playButton, SIGNAL("clicked()"), self.play)
         QWidget.connect(self.pauseButton, SIGNAL("clicked()"), self.pause)
-        QWidget.connect(self.stopButton, SIGNAL("clicked()"), self.stop)        
+        QWidget.connect(self.stopButton, SIGNAL("clicked()"), self.stop)      
         
     def setNextSource(self, urlString):
         self.nextSource = MediaSourceInfo(urlString, None)
