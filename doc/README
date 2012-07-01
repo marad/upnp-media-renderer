@@ -9,3 +9,6 @@ System requirements:
 Installation:
 	Ubuntu:
 		sudo apt-get install python-twisted python-qt4 python-lxml python-qt4-phonon
+
+	Arch Linux
+	  sudo pacman -S python2 python2-lxml twisted python2-pyqt phonon
