@@ -177,28 +177,18 @@ if __name__ == '__main__':
     
     dev = builder.deviceFromFile("xml/renderer.xml", False)
     
-    #print dir(dev)
-    print dev.friendlyName
-    print dev.deviceType
-    print dev.UDN
+    print "Device Name:", dev.friendlyName
+    print "Device Type:", dev.deviceType
+    print "Device UDN:", dev.UDN
     
     window = Player()
     window.show()
     
-    #btn = QPushButton('CLOSE')
-    #QPushButton.connect(btn, SIGNAL("clicked()"), upnpy.localDeviceManager.byeBye)
-    #btn.show()
+    devMan = upnpy.localDeviceManager
     
-    devs = upnpy.localDeviceManager
-    
-    print dev
-    srv = MyService()
-    srv.serviceType = 'urn:schemas-upnp-org:service:MyService:1'
-    srv.serviceId = 'AddService'
-    #dev.addService(srv)
     dev.addService(ConnectionManager())
     dev.addService(RenderingControl(window.player))
     dev.addService(AVTransport(window.player))
-    devs.addDevice(dev)
+    devMan.addDevice(dev)
     
     upnpy.run()
