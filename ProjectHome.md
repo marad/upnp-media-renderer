@@ -1,0 +1,1 @@
+This project is an attempt to create a UPnP media renderer in Python.
